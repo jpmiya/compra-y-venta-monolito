@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<h2>Bienvenido, {{ user.email }}</h2>
+<p class="text-muted">Sistema de Compra y Venta — Etapa 1</p>
+
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <h1 class="display-4">{{ total_personas }}</h1>
+        <p class="text-muted">Personas registradas</p>
+        <a href="/personas" class="btn btn-primary btn-sm">Ver personas</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Usuarios de {{ persona.nombre_completo }}{% endblock %}
+{% block content %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/personas">Personas</a></li>
+    <li class="breadcrumb-item active">{{ persona.nombre_completo }} — Usuarios</li>
+  </ol>
+</nav>
+
+<h2>Usuarios de {{ persona.nombre_completo }}</h2>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if usuarios %}
+<table class="table table-bordered table-hover mb-4">
+  <thead class="table-dark">
+    <tr>
+      <th>Email</th>
+      <th>Firebase UID</th>
+      <th>Último acceso</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in usuarios %}
+    <tr>
+      <td>{{ u.email }}</td>
+      <td><code>{{ u.firebase_uid }}</code></td>
+      <td>{{ u.fecha_ultimo_acceso.strftime('%d/%m/%Y %H:%M') if u.fecha_ultimo_acceso else "—" }}</td>
+      <td>
+        <span class="badge {% if u.estado == 'activo' %}bg-success{% else %}bg-secondary{% endif %}">
+          {{ u.estado }}
+        </span>
+      </td>
+      <td>
+        <form method="post" action="/usuarios/{{ u.id }}/eliminar" class="d-inline"
+              onsubmit="return confirm('¿Dar de baja a {{ u.email }}?')">
+          <button class="btn btn-sm btn-outline-danger">Baja</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted mb-4">Esta persona no tiene usuarios registrados.</p>
+{% endif %}
+
+<hr>
+<h5>Agregar usuario</h5>
+<form method="post" action="/personas/{{ persona.id }}/usuarios/nuevo" class="row g-3">
+  <div class="col-md-4">
+    <label class="form-label">Email</label>
+    <input type="email" name="email" class="form-control" required>
+  </div>
+  <div class="col-md-5">
+    <label class="form-label">Firebase UID</label>
+    <input type="text" name="firebase_uid" class="form-control" required
+           placeholder="Lo encontrás en Firebase Console → Authentication → Users">
+  </div>
+  <div class="col-md-3 d-flex align-items-end">
+    <button type="submit" class="btn btn-primary w-100">Agregar</button>
+  </div>
+</form>
+
+{% endblock %}

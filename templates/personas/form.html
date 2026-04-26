@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{% if persona %}Editar persona{% else %}Nueva persona{% endif %}{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <h2>{% if persona %}Editar persona{% else %}Nueva persona{% endif %}</h2>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post"
+          action="{% if persona %}/personas/{{ persona.id }}/editar{% else %}/personas/nueva{% endif %}">
+
+      <div class="mb-3">
+        <label class="form-label">Nombre completo *</label>
+        <input type="text" name="nombre_completo" class="form-control" required
+               value="{{ persona.nombre_completo if persona else '' }}">
+      </div>
+
+      {% if not persona %}
+      <div class="mb-3">
+        <label class="form-label">Documento de identidad *</label>
+        <input type="text" name="documento_identidad" class="form-control" required>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label class="form-label">Teléfono</label>
+        <input type="text" name="telefono" class="form-control"
+               value="{{ persona.telefono if persona and persona.telefono else '' }}">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Fecha de nacimiento</label>
+        <input type="date" name="fecha_nacimiento" class="form-control"
+               value="{{ persona.fecha_nacimiento if persona and persona.fecha_nacimiento else '' }}">
+      </div>
+
+      {% if persona %}
+      <div class="mb-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          <option value="activo" {% if persona.estado == 'activo' %}selected{% endif %}>Activo</option>
+          <option value="inactivo" {% if persona.estado == 'inactivo' %}selected{% endif %}>Inactivo</option>
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="/personas" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

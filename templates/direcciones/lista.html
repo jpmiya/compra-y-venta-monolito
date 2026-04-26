@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Direcciones de {{ persona.nombre_completo }}{% endblock %}
+{% block content %}
+
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="/personas">Personas</a></li>
+    <li class="breadcrumb-item active">{{ persona.nombre_completo }} — Direcciones</li>
+  </ol>
+</nav>
+
+<h2>Direcciones de {{ persona.nombre_completo }}</h2>
+
+{% if direcciones %}
+<table class="table table-bordered table-hover mb-4">
+  <thead class="table-dark">
+    <tr>
+      <th>Calle</th>
+      <th>Número</th>
+      <th>Ciudad</th>
+      <th>Provincia</th>
+      <th>Descripción</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in direcciones %}
+    <tr>
+      <td>{{ d.calle }}</td>
+      <td>{{ d.numero }}</td>
+      <td>{{ d.ciudad }}</td>
+      <td>{{ d.provincia }}</td>
+      <td>{{ d.descripcion or "—" }}</td>
+      <td>
+        <a href="/direcciones/{{ d.id }}/editar" class="btn btn-sm btn-outline-secondary">Editar</a>
+        <form method="post" action="/direcciones/{{ d.id }}/eliminar" class="d-inline"
+              onsubmit="return confirm('¿Eliminar esta dirección?')">
+          <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted mb-4">No hay direcciones registradas.</p>
+{% endif %}
+
+<hr>
+<h5>Agregar dirección</h5>
+<form method="post" action="/personas/{{ persona.id }}/direcciones/nueva" class="row g-3">
+  <div class="col-md-4">
+    <label class="form-label">Calle *</label>
+    <input type="text" name="calle" class="form-control" required>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Número *</label>
+    <input type="text" name="numero" class="form-control" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Ciudad *</label>
+    <input type="text" name="ciudad" class="form-control" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Provincia *</label>
+    <input type="text" name="provincia" class="form-control" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Descripción</label>
+    <input type="text" name="descripcion" class="form-control" placeholder="ej: Local comercial">
+  </div>
+  <div class="col-md-3 d-flex align-items-end">
+    <button type="submit" class="btn btn-primary w-100">Agregar</button>
+  </div>
+</form>
+
+{% endblock %}
