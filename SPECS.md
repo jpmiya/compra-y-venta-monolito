@@ -31,6 +31,164 @@ Al iniciar una sesión nueva, leer primero la sección "Estado Actual" de este a
 
 ## 📍 Estado Actual
 
+### Sesión 2026-04-26 — Iteración 6 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Implementada encriptación AES-256-GCM en `app/core/encryption.py` con `EncryptedString` TypeDecorator.
+- Aplicada a `documento_identidad` (Persona) y `email` (Usuario) — se cifran automáticamente al guardar y descifran al leer.
+- Agregada variable `ENCRYPTION_KEY` en `config.py` (base64 de 32 bytes).
+- Agregado middleware de logging HTTP en `main.py`: registra método, path, status y duración de cada request.
+- Agregados logs de operaciones críticas: CHECKOUT, DELIVERY TOMADO, DELIVERY ENTREGADO.
+- README.md actualizado (stack correcto, sección Firebase, tabla de endpoints, variables de entorno).
+- Fix: búsqueda ahora filtra `stock > 0`.
+- Fix: `ProductoResponse` incluye datos completos de `direccion_punto_venta` (calle, ciudad, etc.).
+
+**Estado de los tests:** Escritos, pendientes de correr contra BD real.
+
+**Decisiones técnicas:**
+- Encriptación determinística (nonce = SHA-256(key + plaintext)[:12]) para permitir búsquedas SQL por igualdad sin romper los services existentes.
+- Si `ENCRYPTION_KEY` está vacía, el sistema funciona sin cifrado (útil para desarrollo sin configurar la clave).
+
+**Próximos pasos sugeridos:**
+1. Juampi: levantar BD, generar `ENCRYPTION_KEY`, correr `alembic upgrade head` + `pytest`.
+2. Dockerfile + pipeline CI/CD.
+3. Colección Postman.
+4. Diagramas C4 y UML.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
+### Sesión 2026-04-26 — Iteración 5 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Agregados fixtures `direccion_test`, `categoria_test` y `producto_test` en `conftest.py`.
+- Creado `tests/unit/test_billetera.py` — 6 tests: creación automática, carga, acumulación, monto negativo, límite superado, historial.
+- Creado `tests/unit/test_checkout.py` — 7 tests: carrito vacío, sin saldo, checkout exitoso, descuento de saldo, vaciado de carrito, descuento de stock, transacción en historial.
+- Creado `tests/unit/test_delivery.py` — 7 tests: listar pendientes, detalle, tomar, tomar ya asignado, mis-asignados, entregar, entregar sin tomar.
+
+**Estado de los tests:** Escritos, pendientes de correr contra BD real (Juampi configura el entorno).
+
+**Decisiones técnicas:**
+- Los tests de delivery usan un helper `_hacer_checkout()` para crear deliveries sin repetir código.
+- Todos los tests verifican comportamiento esperado (status codes + valores de negocio), no implementación interna.
+
+**Próximos pasos sugeridos:**
+1. Juampi: levantar BD y correr `alembic upgrade head` + `pytest`.
+2. Revisar si hay casos de borde faltantes una vez que corran los tests.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
+### Sesión 2026-04-26 — Iteración 4 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Agregado `POST /carrito/checkout` con transacción atómica.
+- Agregados schemas `CheckoutRequest` (requiere `direccion_entrega`) y `CheckoutResponse` (lista de delivery orders + total cobrado + moneda).
+- La función `checkout()` en el service ejecuta en un único `db.commit()`:
+  1. Valida que el carrito no esté vacío.
+  2. Valida stock activo por cada item.
+  3. Verifica saldo suficiente en billetera.
+  4. Crea un `DeliveryOrder` por cada item.
+  5. Descuenta stock de cada producto.
+  6. Descuenta saldo de la billetera (vía `descontar_saldo` sin commit propio).
+  7. Vacía el carrito (elimina items, resetea descuento).
+- Router actualizado con el nuevo endpoint.
+
+**Estado de los tests:** Sin tests aún.
+
+**Decisiones técnicas:**
+- El import de `billetera.service` dentro de la función evita importaciones circulares entre módulos.
+- El checkout usa el precio guardado en `CarritoItem.precio_unitario` (precio al momento de agregar), no el precio actual del producto — comportamiento estándar de e-commerce.
+
+**Próximos pasos sugeridos:**
+1. Correr primera migración Alembic.
+2. Escribir tests.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
+### Sesión 2026-04-26 — Iteración 3 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Creado módulo `delivery` completo: modelos, schemas, service, router.
+- `DeliveryOrder`: estados `pendiente → asignada → entregada`, registra fecha de asignación y entrega automáticamente.
+- Endpoints: `GET /deliveries`, `GET /deliveries/mis-asignados`, `GET /deliveries/{id}`, `POST /deliveries/{id}/tomar`, `POST /deliveries/{id}/entregar`.
+- Router registrado en `main.py`.
+
+**Estado de los tests:** Sin tests aún.
+
+**Decisiones técnicas:**
+- `GET /deliveries/mis-asignados` se declara antes de `GET /deliveries/{id}` para evitar que FastAPI intente parsear el string como UUID.
+- Las validaciones de estado y pertenencia del entregador viven en el service.
+- `DeliveryOrder` no tiene relaciones ORM explícitas para mantener el modelo liviano; las FKs alcanzan para las migraciones.
+
+**Próximos pasos sugeridos:**
+1. Agregar `POST /carrito/checkout` con transacción atómica.
+2. Correr primera migración Alembic.
+3. Escribir tests.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
+### Sesión 2026-04-26 — Iteración 2 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Creado módulo `billetera` completo: modelos, schemas, service, router.
+- `BilleteraVirtual`: un usuario tiene una única billetera (unique en usuario_id). Se crea automáticamente al primer acceso.
+- `TransaccionBilletera`: enum `carga / compra`. Se registra en cada operación.
+- Endpoints: `GET /billetera`, `POST /billetera/cargar`, `GET /billetera/historial`.
+- Agregados parámetros `BILLETERA_LIMITE_CARGA` (default 100000) y `BILLETERA_MONEDA` (default ARS) en `config.py`.
+- El service expone `descontar_saldo()` para uso interno del checkout (no tiene endpoint propio).
+- Router registrado en `main.py`.
+
+**Estado de los tests:** Sin tests aún.
+
+**Decisiones técnicas:**
+- `get_or_create_billetera` crea la billetera transparentemente en el primer acceso, sin necesidad de un endpoint de registro explícito.
+- `descontar_saldo` no hace commit — delega eso al checkout para que sea parte de la transacción atómica.
+
+**Próximos pasos sugeridos:**
+1. Crear módulo `delivery` (DeliveryOrder con flujo pendiente → asignada → entregada).
+2. Agregar `POST /carrito/checkout` con transacción atómica.
+3. Correr primera migración Alembic.
+4. Escribir tests.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
+### Sesión 2026-04-26 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Agregado campo `direccion_punto_venta_id` (FK → `direcciones`) en el modelo `Producto`.
+- Agregada relación `direccion_punto_venta` en el modelo `Producto`.
+- Actualizado `ProductoCreate` para requerir `direccion_punto_venta_id`.
+- Actualizado `ProductoUpdate` para permitir actualizar `direccion_punto_venta_id`.
+- Actualizado `ProductoResponse` para exponer `direccion_punto_venta_id`.
+- Agregada función `validar_direccion_vendedor` en el service: verifica que la dirección exista, esté activa y pertenezca a la persona del vendedor.
+- Router de productos actualiza el endpoint `POST /productos` para capturar el `ValueError` de la validación.
+
+**Estado de los tests:** Sin tests aún.
+
+**Decisiones técnicas:**
+- Se optó por validar la pertenencia de la dirección comparando `direccion.persona_id == vendedor.persona_id` en el service (no en el router), manteniendo la lógica de negocio centralizada.
+- Se mantuvieron los campos extra (SKU, reseñas, imágenes, calificación) ya existentes — Opción B acordada.
+
+**Próximos pasos sugeridos:**
+1. Crear módulo `billetera` (BilleteraVirtual + TransaccionBilletera).
+2. Crear módulo `delivery` (DeliveryOrder con flujo pendiente → asignada → entregada).
+3. Agregar `POST /carrito/checkout` con transacción atómica.
+4. Correr primera migración Alembic.
+5. Escribir tests.
+
+**Problemas conocidos / deuda técnica:** Ninguno.
+
+---
+
 ### Push #1 — 2026-04-26 (Juan)
 
 **Qué se hizo en esta sesión:**

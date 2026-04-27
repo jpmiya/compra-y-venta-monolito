@@ -10,6 +10,8 @@ from app.modules.carrito.schemas import (
     ModificarCantidadRequest,
     AplicarDescuentoRequest,
     CarritoResponse,
+    CheckoutRequest,
+    CheckoutResponse,
 )
 
 router = APIRouter(prefix="/carrito", tags=["Carrito"])
@@ -94,3 +96,15 @@ async def remover_descuento(
 ):
     carrito = await service.remover_descuento(db, current_user.id)
     return service.calcular_totales(carrito)
+
+
+@router.post("/checkout", response_model=CheckoutResponse, status_code=status.HTTP_201_CREATED)
+async def checkout(
+    data: CheckoutRequest,
+    current_user=Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await service.checkout(db, current_user.id, data.direccion_entrega)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

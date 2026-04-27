@@ -48,3 +48,31 @@ class CarritoResponse(BaseModel):
     total: float
     codigo_descuento: Optional[str]
     fecha_creacion: datetime
+
+
+class CheckoutRequest(BaseModel):
+    direccion_entrega: str
+
+    @field_validator("direccion_entrega")
+    @classmethod
+    def validate_direccion(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("La dirección de entrega no puede estar vacía")
+        return v
+
+
+class CheckoutDeliveryItem(BaseModel):
+    id: uuid.UUID
+    producto_id: uuid.UUID
+    cantidad: int
+    precio_unitario: float
+    direccion_entrega: str
+    estado: str
+
+    model_config = {"from_attributes": True}
+
+
+class CheckoutResponse(BaseModel):
+    delivery_orders: List[CheckoutDeliveryItem]
+    total_cobrado: float
+    moneda: str

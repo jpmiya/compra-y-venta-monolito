@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.core.database import Base
+from app.core.encryption import EncryptedString
 
 usuario_roles = Table(
     "usuario_roles",
@@ -34,7 +35,7 @@ class Persona(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre_completo: Mapped[str] = mapped_column(String(200), nullable=False)
     documento_identidad: Mapped[str] = mapped_column(
-        String(50), unique=True, nullable=False, index=True
+        EncryptedString(255), unique=True, nullable=False, index=True
     )
     telefono: Mapped[str | None] = mapped_column(String(20))
     fecha_nacimiento: Mapped[date | None] = mapped_column(Date)
@@ -58,7 +59,7 @@ class Usuario(Base):
     persona_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("personas.id"), nullable=False
     )
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(EncryptedString(500), unique=True, nullable=False, index=True)
     firebase_uid: Mapped[str] = mapped_column(
         String(128), unique=True, nullable=False, index=True
     )

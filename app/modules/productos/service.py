@@ -4,8 +4,9 @@ from typing import Optional, List
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.modules.admin.models import Usuario
+from app.modules.admin.models import Usuario, Direccion
 from app.modules.productos.models import Producto, Categoria, Resena
 from app.modules.productos.schemas import ProductoCreate, ProductoUpdate, ResenaCreate
 
@@ -23,7 +24,11 @@ async def listar_productos(
     orden: str = "fecha_creacion",
     ascendente: bool = False,
 ) -> dict:
-    query = select(Producto).where(Producto.activo == True)
+    query = (
+        select(Producto)
+        .options(selectinload(Producto.direccion_punto_venta))
+        .where(Producto.activo == True, Producto.stock > 0)
+    )
 
     if busqueda:
         query = query.where(
@@ -68,7 +73,20 @@ async def get_producto_by_sku(db: AsyncSession, sku: str) -> Optional[Producto]:
     return result.scalar_one_or_none()
 
 
+async def validar_direccion_vendedor(
+    db: AsyncSession, direccion_id: uuid.UUID, vendedor: Usuario
+) -> Direccion:
+    result = await db.execute(select(Direccion).where(Direccion.id == direccion_id))
+    direccion = result.scalar_one_or_none()
+    if not direccion or not direccion.activa:
+        raise ValueError("Dirección no encontrada o inactiva")
+    if direccion.persona_id != vendedor.persona_id:
+        raise ValueError("La dirección no pertenece al vendedor")
+    return direccion
+
+
 async def crear_producto(db: AsyncSession, data: ProductoCreate, vendedor: Usuario) -> Producto:
+    await validar_direccion_vendedor(db, data.direccion_punto_venta_id, vendedor)
     producto = Producto(
         nombre=data.nombre,
         descripcion=data.descripcion,
@@ -78,6 +96,7 @@ async def crear_producto(db: AsyncSession, data: ProductoCreate, vendedor: Usuar
         sku=data.sku,
         imagenes=data.imagenes,
         vendedor_id=vendedor.id,
+        direccion_punto_venta_id=data.direccion_punto_venta_id,
     )
     db.add(producto)
     await db.commit()

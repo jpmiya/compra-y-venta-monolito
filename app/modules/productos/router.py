@@ -59,7 +59,10 @@ async def crear_producto(
 ):
     if await service.get_producto_by_sku(db, data.sku):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SKU ya registrado")
-    return await service.crear_producto(db, data, current_user)
+    try:
+        return await service.crear_producto(db, data, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.put("/{producto_id}", response_model=ProductoResponse)

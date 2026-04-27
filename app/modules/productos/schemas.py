@@ -5,6 +5,17 @@ from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
 
+class DireccionPuntoVentaResponse(BaseModel):
+    id: uuid.UUID
+    calle: str
+    numero: str
+    ciudad: str
+    provincia: str
+    descripcion: Optional[str]
+
+    model_config = {"from_attributes": True}
+
+
 class CategoriaResponse(BaseModel):
     id: uuid.UUID
     nombre: str
@@ -22,6 +33,7 @@ class ProductoCreate(BaseModel):
     stock: int
     sku: str
     imagenes: List[str]
+    direccion_punto_venta_id: uuid.UUID
 
     @field_validator("nombre")
     @classmethod
@@ -64,6 +76,7 @@ class ProductoUpdate(BaseModel):
     stock: Optional[int] = None
     imagenes: Optional[List[str]] = None
     activo: Optional[bool] = None
+    direccion_punto_venta_id: Optional[uuid.UUID] = None
 
     @field_validator("precio")
     @classmethod
@@ -100,6 +113,8 @@ class ProductoResponse(BaseModel):
     sku: str
     imagenes: List[str]
     vendedor_id: uuid.UUID
+    direccion_punto_venta_id: uuid.UUID
+    direccion_punto_venta: Optional[DireccionPuntoVentaResponse] = None
     activo: bool
     calificacion_promedio: float
     fecha_creacion: datetime

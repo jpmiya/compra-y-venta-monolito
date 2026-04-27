@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Optional
 
@@ -5,7 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+logger = logging.getLogger(__name__)
+
 from app.modules.carrito.models import Carrito, CarritoItem
+from app.modules.delivery.models import DeliveryOrder
 from app.modules.productos.models import Producto
 
 MAX_ITEMS = 100
@@ -152,6 +156,82 @@ async def remover_descuento(db: AsyncSession, usuario_id: uuid.UUID) -> Carrito:
     carrito.descuento = 0.0
     await db.commit()
     return await _cargar_carrito(db, usuario_id)
+
+
+async def checkout(
+    db: AsyncSession, usuario_id: uuid.UUID, direccion_entrega: str
+) -> dict:
+    from app.modules.billetera.service import get_or_create_billetera, descontar_saldo
+
+    carrito = await _cargar_carrito(db, usuario_id)
+    if not carrito.items:
+        raise ValueError("El carrito está vacío")
+
+    # Validar stock de cada item y cargar productos
+    productos = {}
+    for item in carrito.items:
+        result = await db.execute(
+            select(Producto).where(Producto.id == item.producto_id, Producto.activo == True)
+        )
+        producto = result.scalar_one_or_none()
+        if not producto:
+            raise ValueError(f"Producto {item.producto_id} no encontrado o inactivo")
+        if producto.stock < item.cantidad:
+            raise ValueError(f"Stock insuficiente para '{producto.nombre}'")
+        productos[item.producto_id] = producto
+
+    # Calcular total con descuento
+    subtotal = sum(i.cantidad * i.precio_unitario for i in carrito.items)
+    total = round(max(0.0, subtotal - carrito.descuento), 2)
+
+    # Verificar saldo en billetera
+    billetera = await get_or_create_billetera(db, usuario_id)
+    if billetera.saldo < total:
+        raise ValueError("Saldo insuficiente en la billetera")
+
+    # Crear DeliveryOrder y descontar stock por cada item
+    delivery_orders = []
+    for item in carrito.items:
+        producto = productos[item.producto_id]
+        order = DeliveryOrder(
+            comprador_id=usuario_id,
+            producto_id=item.producto_id,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio_unitario,
+            direccion_entrega=direccion_entrega,
+            direccion_punto_venta_id=producto.direccion_punto_venta_id,
+        )
+        db.add(order)
+        delivery_orders.append(order)
+        producto.stock -= item.cantidad
+
+    # Descontar billetera (sin commit propio)
+    await descontar_saldo(
+        db,
+        billetera,
+        total,
+        f"Compra: {len(carrito.items)} item(s) — {total} {billetera.moneda}",
+    )
+
+    # Vaciar carrito
+    for item in carrito.items:
+        await db.delete(item)
+    carrito.codigo_descuento = None
+    carrito.descuento = 0.0
+
+    # Commit único — todo o nada
+    await db.commit()
+
+    logger.info(
+        "CHECKOUT usuario=%s items=%d total=%.2f %s",
+        usuario_id, len(carrito.items), total, billetera.moneda,
+    )
+
+    return {
+        "delivery_orders": delivery_orders,
+        "total_cobrado": total,
+        "moneda": billetera.moneda,
+    }
 
 
 def calcular_totales(carrito: Carrito) -> dict:

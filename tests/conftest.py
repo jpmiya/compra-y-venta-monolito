@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from app.core.database import Base
 from app.core.dependencies import get_db
 from app.main import app
-from app.modules.admin.models import Persona, Usuario
+from app.modules.admin.models import Direccion, Persona, Usuario
+from app.modules.productos.models import Categoria, Producto
 
 TEST_DATABASE_URL = "postgresql+asyncpg://test:test@localhost:5432/compra_venta_test"
 
@@ -75,3 +76,53 @@ async def client(db: AsyncSession, usuario_test: Usuario) -> AsyncClient:
             yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def direccion_test(db: AsyncSession, usuario_test: Usuario) -> Direccion:
+    direccion = Direccion(
+        persona_id=usuario_test.persona_id,
+        calle="Av. Corrientes",
+        numero="1234",
+        ciudad="Buenos Aires",
+        provincia="CABA",
+        descripcion="Local test",
+        activa=True,
+    )
+    db.add(direccion)
+    await db.commit()
+    await db.refresh(direccion)
+    return direccion
+
+
+@pytest_asyncio.fixture
+async def categoria_test(db: AsyncSession) -> Categoria:
+    categoria = Categoria(nombre="Electrónica", descripcion="Productos electrónicos")
+    db.add(categoria)
+    await db.commit()
+    await db.refresh(categoria)
+    return categoria
+
+
+@pytest_asyncio.fixture
+async def producto_test(
+    db: AsyncSession,
+    usuario_test: Usuario,
+    direccion_test: Direccion,
+    categoria_test: Categoria,
+) -> Producto:
+    producto = Producto(
+        nombre="Notebook Test",
+        descripcion="Una notebook de prueba",
+        precio=1000.0,
+        stock=10,
+        sku="SKU-TEST-001",
+        imagenes=["img1.jpg"],
+        vendedor_id=usuario_test.id,
+        direccion_punto_venta_id=direccion_test.id,
+        categoria_id=categoria_test.id,
+    )
+    db.add(producto)
+    await db.commit()
+    await db.refresh(producto)
+    return producto

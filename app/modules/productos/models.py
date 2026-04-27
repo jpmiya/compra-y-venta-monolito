@@ -37,12 +37,18 @@ class Producto(Base):
     vendedor_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
     )
+    direccion_punto_venta_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("direcciones.id"), nullable=False
+    )
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     calificacion_promedio: Mapped[float] = mapped_column(Float, default=0.0)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     categoria: Mapped["Categoria"] = relationship("Categoria", back_populates="productos")
     resenas: Mapped[List["Resena"]] = relationship("Resena", back_populates="producto")
+    direccion_punto_venta: Mapped["Direccion"] = relationship(
+        "Direccion", foreign_keys=[direccion_punto_venta_id]
+    )
 
 
 class Resena(Base):
