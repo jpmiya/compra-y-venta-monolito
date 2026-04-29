@@ -1,0 +1,52 @@
+# VCS
+.git
+.gitignore
+.gitlab-ci.yml
+.github
+
+# Virtual envs
+.venv
+venv
+env
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.egg-info
+
+# Tests (no se incluyen en la imagen de producción)
+tests
+pytest.ini
+
+# Builds
+dist
+build
+target
+
+# Secretos y entorno local — NUNCA en la imagen
+.env
+.env.*
+!.env.example
+firebase-service-account.json
+*.pem
+*.key
+
+# IDE / OS
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Docs / repo meta
+README.md
+SPECS.md
+docs
+
+# Docker meta (no necesarios dentro de la imagen)
+Dockerfile
+.dockerignore
