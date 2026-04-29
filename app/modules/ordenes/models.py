@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Float, Integer, String, DateTime, ForeignKey
 from sqlalchemy import Enum as SAEnum
@@ -31,7 +32,7 @@ class Orden(Base):
     )
     direccion_entrega: Mapped[str] = mapped_column(String(255), nullable=False)
     telefono_contacto: Mapped[str] = mapped_column(String(20), nullable=False)
-    numero_seguimiento: Mapped[str | None] = mapped_column(String(100))
+    numero_seguimiento: Mapped[Optional[str]] = mapped_column(String(100))
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     fecha_actualizacion: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow

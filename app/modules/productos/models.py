@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy import Enum as SAEnum
@@ -15,8 +15,8 @@ class Categoria(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    descripcion: Mapped[str | None] = mapped_column(Text)
-    imagen: Mapped[str | None] = mapped_column(String(500))
+    descripcion: Mapped[Optional[str]] = mapped_column(Text)
+    imagen: Mapped[Optional[str]] = mapped_column(String(500))
 
     productos: Mapped[List["Producto"]] = relationship("Producto", back_populates="categoria")
 
@@ -26,7 +26,7 @@ class Producto(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    descripcion: Mapped[str | None] = mapped_column(Text)
+    descripcion: Mapped[Optional[str]] = mapped_column(Text)
     precio: Mapped[float] = mapped_column(Float, nullable=False)
     categoria_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("categorias.id"), nullable=False, index=True
@@ -62,7 +62,7 @@ class Resena(Base):
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False
     )
     calificacion: Mapped[int] = mapped_column(Integer, nullable=False)
-    comentario: Mapped[str | None] = mapped_column(Text)
+    comentario: Mapped[Optional[str]] = mapped_column(Text)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     producto: Mapped["Producto"] = relationship("Producto", back_populates="resenas")

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import String, DateTime, Text, Boolean, Integer
 from sqlalchemy import Enum as SAEnum
@@ -26,4 +27,4 @@ class Notificacion(Base):
     enviada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    fecha_envio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fecha_envio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))

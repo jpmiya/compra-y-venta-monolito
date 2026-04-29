@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import Float, Integer, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -15,7 +16,7 @@ class Carrito(Base):
     usuario_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False, unique=True
     )
-    codigo_descuento: Mapped[str | None] = mapped_column(String(50))
+    codigo_descuento: Mapped[Optional[str]] = mapped_column(String(50))
     descuento: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     fecha_creacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 

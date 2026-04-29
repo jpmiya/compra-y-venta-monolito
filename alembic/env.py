@@ -13,6 +13,8 @@ import app.modules.productos.models  # noqa: F401
 import app.modules.carrito.models  # noqa: F401
 import app.modules.ordenes.models  # noqa: F401
 import app.modules.notificaciones.models  # noqa: F401
+import app.modules.billetera.models  # noqa: F401
+import app.modules.delivery.models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

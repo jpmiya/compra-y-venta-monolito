@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import String, DateTime, Date, Boolean, ForeignKey, Table, Column
 from sqlalchemy import Enum as SAEnum
@@ -37,8 +37,8 @@ class Persona(Base):
     documento_identidad: Mapped[str] = mapped_column(
         EncryptedString(255), unique=True, nullable=False, index=True
     )
-    telefono: Mapped[str | None] = mapped_column(String(20))
-    fecha_nacimiento: Mapped[date | None] = mapped_column(Date)
+    telefono: Mapped[Optional[str]] = mapped_column(String(20))
+    fecha_nacimiento: Mapped[Optional[date]] = mapped_column(Date)
     fecha_registro: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -63,7 +63,7 @@ class Usuario(Base):
     firebase_uid: Mapped[str] = mapped_column(
         String(128), unique=True, nullable=False, index=True
     )
-    fecha_ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fecha_ultimo_acceso: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     estado: Mapped[str] = mapped_column(
         SAEnum("activo", "inactivo", name="estado_usuario_enum"),
         nullable=False,
@@ -87,7 +87,7 @@ class Direccion(Base):
     numero: Mapped[str] = mapped_column(String(20), nullable=False)
     ciudad: Mapped[str] = mapped_column(String(100), nullable=False)
     provincia: Mapped[str] = mapped_column(String(100), nullable=False)
-    descripcion: Mapped[str | None] = mapped_column(String(200))
+    descripcion: Mapped[Optional[str]] = mapped_column(String(200))
     activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     persona: Mapped["Persona"] = relationship("Persona", back_populates="direcciones")
