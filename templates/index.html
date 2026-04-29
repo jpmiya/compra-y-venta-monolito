@@ -5,13 +5,40 @@
 <h2>Bienvenido, {{ user.email }}</h2>
 <p class="text-muted">Sistema de Compra y Venta — Etapa 1</p>
 
-<div class="row mt-4">
-  <div class="col-md-4">
+<div class="row mt-4 g-3">
+  <div class="col-md-3">
     <div class="card text-center shadow-sm">
       <div class="card-body">
-        <h1 class="display-4">{{ total_personas }}</h1>
-        <p class="text-muted">Personas registradas</p>
-        <a href="/personas" class="btn btn-primary btn-sm">Ver personas</a>
+        <h1 class="display-5 fw-bold text-primary">{{ total_personas }}</h1>
+        <p class="text-muted mb-2">Personas</p>
+        <a href="/personas" class="btn btn-primary btn-sm">Ver</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <h1 class="display-5 fw-bold text-success">{{ total_productos }}</h1>
+        <p class="text-muted mb-2">Productos activos</p>
+        <a href="/ui/productos" class="btn btn-success btn-sm">Ver</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <h1 class="display-5 fw-bold text-warning">{{ total_deliveries }}</h1>
+        <p class="text-muted mb-2">Entregas pendientes</p>
+        <a href="/ui/deliveries" class="btn btn-warning btn-sm">Ver</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <h1 class="display-5 fw-bold text-info">$ {{ saldo }}</h1>
+        <p class="text-muted mb-2">Saldo billetera</p>
+        <a href="/ui/billetera" class="btn btn-info btn-sm">Ver</a>
       </div>
     </div>
   </div>

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Billetera{% endblock %}
+{% block content %}
+
+<h2>Billetera Virtual</h2>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+{% if mensaje %}
+<div class="alert alert-success">{{ mensaje }}</div>
+{% endif %}
+
+<div class="row g-3 mt-1">
+  <div class="col-md-4">
+    <div class="card shadow-sm text-center">
+      <div class="card-body py-4">
+        <p class="text-muted mb-1">Saldo disponible</p>
+        <h1 class="display-5 fw-bold text-success">$ {{ "%.2f"|format(billetera.saldo) }}</h1>
+        <p class="text-muted small">{{ billetera.moneda }}</p>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h6 class="card-title">Cargar saldo</h6>
+        <form method="post" action="/ui/billetera/cargar">
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="monto" class="form-control" placeholder="0.00"
+                   step="0.01" min="0.01" required>
+            <button type="submit" class="btn btn-success">Cargar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <h5>Historial de transacciones</h5>
+    {% if transacciones %}
+    <table class="table table-sm table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Descripción</th>
+          <th class="text-end">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transacciones %}
+        <tr>
+          <td class="small">{{ t.fecha.strftime("%d/%m/%Y %H:%M") }}</td>
+          <td>
+            <span class="badge {% if t.tipo == 'carga' %}bg-success{% else %}bg-danger{% endif %}">
+              {{ t.tipo }}
+            </span>
+          </td>
+          <td class="small">{{ t.descripcion or "—" }}</td>
+          <td class="text-end fw-bold {% if t.tipo == 'carga' %}text-success{% else %}text-danger{% endif %}">
+            {{ "+" if t.tipo == "carga" else "-" }}$ {{ "%.2f"|format(t.monto) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Sin transacciones aún.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

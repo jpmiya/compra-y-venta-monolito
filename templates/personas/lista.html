@@ -35,8 +35,8 @@
       </td>
       <td>
         <a href="/personas/{{ p.id }}/editar" class="btn btn-sm btn-outline-secondary">Editar</a>
-        <a href="/personas/{{ p.id }}/usuarios" class="btn btn-sm btn-outline-primary">Usuarios</a>
-        <a href="/personas/{{ p.id }}/direcciones" class="btn btn-sm btn-outline-info">Direcciones</a>
+        <a href="/ui/personas/{{ p.id }}/usuarios" class="btn btn-sm btn-outline-primary">Usuarios</a>
+        <a href="/ui/personas/{{ p.id }}/direcciones" class="btn btn-sm btn-outline-info">Direcciones</a>
         <form method="post" action="/personas/{{ p.id }}/eliminar" class="d-inline"
               onsubmit="return confirm('¿Dar de baja a {{ p.nombre_completo }}?')">
           <button class="btn btn-sm btn-outline-danger">Baja</button>

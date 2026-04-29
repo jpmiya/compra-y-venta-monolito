@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Buscar Productos{% endblock %}
+{% block content %}
+
+<h2>Buscar Productos</h2>
+
+<form method="get" action="/ui/busqueda" class="row g-2 mt-2 mb-4">
+  <div class="col-md-5">
+    <input type="text" name="q" class="form-control" placeholder="Buscar por nombre o descripción..."
+           value="{{ q or '' }}">
+  </div>
+  <div class="col-md-3">
+    <select name="categoria_id" class="form-select">
+      <option value="">Todas las categorías</option>
+      {% for c in categorias %}
+      <option value="{{ c.id }}" {{ "selected" if categoria_id == c.id|string else "" }}>{{ c.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="orden" class="form-select">
+      <option value="fecha_creacion" {{ "selected" if orden == "fecha_creacion" else "" }}>Más recientes</option>
+      <option value="precio" {{ "selected" if orden == "precio" else "" }}>Precio</option>
+      <option value="nombre" {{ "selected" if orden == "nombre" else "" }}>Nombre</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-primary w-100">Buscar</button>
+  </div>
+</form>
+
+{% if mensaje %}
+<div class="alert alert-success">{{ mensaje }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if productos %}
+<p class="text-muted">{{ total }} resultado{{ "s" if total != 1 else "" }}</p>
+<div class="row g-3">
+  {% for p in productos %}
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">{{ p.nombre }}</h5>
+        <p class="text-muted small">{{ p.categoria.nombre if p.categoria else "Sin categoría" }}</p>
+        <p class="card-text small">{{ p.descripcion[:100] }}{% if p.descripcion and p.descripcion|length > 100 %}...{% endif %}</p>
+        <p class="fw-bold text-success fs-5">$ {{ "%.2f"|format(p.precio) }}</p>
+        <p class="small text-muted">Stock: {{ p.stock }}</p>
+        {% if p.direccion_punto_venta %}
+        <p class="small text-muted">📍 {{ p.direccion_punto_venta.calle }} {{ p.direccion_punto_venta.numero }}, {{ p.direccion_punto_venta.ciudad }}</p>
+        {% endif %}
+      </div>
+      <div class="card-footer">
+        <form method="post" action="/ui/carrito/agregar" class="d-flex gap-2">
+          <input type="hidden" name="producto_id" value="{{ p.id }}">
+          <input type="number" name="cantidad" value="1" min="1" max="{{ p.stock }}" class="form-control form-control-sm" style="width:70px">
+          <button type="submit" class="btn btn-primary btn-sm flex-grow-1">+ Carrito</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% elif q or categoria_id %}
+<p class="text-muted">No se encontraron productos.</p>
+{% endif %}
+
+{% endblock %}

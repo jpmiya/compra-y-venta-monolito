@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Deliveries{% endblock %}
+{% block content %}
+
+<h2>Deliveries</h2>
+
+{% if mensaje %}
+<div class="alert alert-success">{{ mensaje }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<ul class="nav nav-tabs mb-3" id="tabs">
+  <li class="nav-item">
+    <a class="nav-link {% if tab != 'asignados' %}active{% endif %}" href="/ui/deliveries">
+      Pendientes <span class="badge bg-warning text-dark">{{ pendientes|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'asignados' %}active{% endif %}" href="/ui/deliveries?tab=asignados">
+      Mis asignados <span class="badge bg-primary">{{ asignados|length }}</span>
+    </a>
+  </li>
+</ul>
+
+{% if tab == 'asignados' %}
+  {% set lista = asignados %}
+  {% set es_asignado = true %}
+{% else %}
+  {% set lista = pendientes %}
+  {% set es_asignado = false %}
+{% endif %}
+
+{% if lista %}
+<table class="table table-bordered table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>Producto</th>
+      <th>Cantidad</th>
+      <th>Dirección entrega</th>
+      <th>Punto de venta</th>
+      <th>Estado</th>
+      <th>Acción</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in lista %}
+    <tr>
+      <td>{{ d.producto_id }}</td>
+      <td>{{ d.cantidad }}</td>
+      <td>{{ d.direccion_entrega }}</td>
+      <td>{{ d.direccion_punto_venta_id }}</td>
+      <td>
+        <span class="badge
+          {% if d.estado == 'pendiente' %}bg-warning text-dark
+          {% elif d.estado == 'asignada' %}bg-primary
+          {% else %}bg-success{% endif %}">
+          {{ d.estado }}
+        </span>
+      </td>
+      <td>
+        {% if d.estado == 'pendiente' %}
+        <form method="post" action="/ui/deliveries/{{ d.id }}/tomar">
+          <button class="btn btn-sm btn-primary">Tomar</button>
+        </form>
+        {% elif d.estado == 'asignada' %}
+        <form method="post" action="/ui/deliveries/{{ d.id }}/entregar"
+              onsubmit="return confirm('¿Marcar como entregado?')">
+          <button class="btn btn-sm btn-success">Entregar</button>
+        </form>
+        {% else %}
+        <span class="text-muted small">Entregado</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted">No hay deliveries en esta sección.</p>
+{% endif %}
+
+{% endblock %}

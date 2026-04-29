@@ -1,0 +1,429 @@
+{
+  "info": {
+    "name": "Compra y Venta - TP1 Monolito",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "token", "value": "PEGAR_FIREBASE_ID_TOKEN_ACA" },
+    { "key": "persona_id", "value": "" },
+    { "key": "usuario_id", "value": "" },
+    { "key": "direccion_id", "value": "" },
+    { "key": "producto_id", "value": "" },
+    { "key": "categoria_id", "value": "" },
+    { "key": "delivery_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 - Personas",
+      "item": [
+        {
+          "name": "Listar personas",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/personas"
+          }
+        },
+        {
+          "name": "Crear persona",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/personas",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_completo\": \"Juan Perez\",\n  \"documento_identidad\": \"12345678\",\n  \"telefono\": \"1134567890\",\n  \"fecha_nacimiento\": \"1990-01-15\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Obtener persona por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/personas/{{persona_id}}"
+          }
+        },
+        {
+          "name": "Actualizar persona",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/personas/{{persona_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_completo\": \"Juan Perez Actualizado\",\n  \"telefono\": \"1198765432\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar persona (baja lógica)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/personas/{{persona_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Usuarios",
+      "item": [
+        {
+          "name": "Listar usuarios de persona",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/personas/{{persona_id}}/usuarios"
+          }
+        },
+        {
+          "name": "Crear usuario para persona",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/personas/{{persona_id}}/usuarios",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"juan@example.com\",\n  \"firebase_uid\": \"FIREBASE_UID_DEL_USUARIO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar usuario",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/usuarios/{{usuario_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"activo\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar usuario (baja lógica)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/usuarios/{{usuario_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Direcciones",
+      "item": [
+        {
+          "name": "Listar direcciones de persona",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/personas/{{persona_id}}/direcciones"
+          }
+        },
+        {
+          "name": "Crear dirección",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/personas/{{persona_id}}/direcciones",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calle\": \"Av. Corrientes\",\n  \"numero\": \"1234\",\n  \"ciudad\": \"Buenos Aires\",\n  \"provincia\": \"CABA\",\n  \"descripcion\": \"Local comercial\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar dirección",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/direcciones/{{direccion_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calle\": \"Av. Santa Fe\",\n  \"numero\": \"5678\",\n  \"ciudad\": \"Buenos Aires\",\n  \"provincia\": \"CABA\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar dirección (baja lógica)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/direcciones/{{direccion_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Productos",
+      "item": [
+        {
+          "name": "Listar categorías",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/productos/categorias",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/productos?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "orden", "value": "fecha_creacion", "disabled": true },
+                { "key": "ascendente", "value": "false", "disabled": true }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Obtener producto por ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/productos/{{producto_id}}",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Crear producto",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/productos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Notebook Lenovo\",\n  \"descripcion\": \"Notebook 15 pulgadas, 16GB RAM, SSD 512GB\",\n  \"precio\": 250000.00,\n  \"stock\": 5,\n  \"sku\": \"NB-LENOVO-001\",\n  \"categoria_id\": \"{{categoria_id}}\",\n  \"direccion_punto_venta_id\": \"{{direccion_id}}\",\n  \"imagenes\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Actualizar producto",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/productos/{{producto_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 230000.00,\n  \"stock\": 8\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar producto (baja lógica)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/productos/{{producto_id}}"
+          }
+        },
+        {
+          "name": "Agregar reseña",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/productos/{{producto_id}}/resena",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calificacion\": 5,\n  \"comentario\": \"Excelente producto, llegó en perfecto estado\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Búsqueda",
+      "item": [
+        {
+          "name": "Buscar productos por texto",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/busqueda?q=notebook",
+              "host": ["{{base_url}}"],
+              "path": ["busqueda"],
+              "query": [
+                { "key": "q", "value": "notebook" },
+                { "key": "orden", "value": "precio", "disabled": true },
+                { "key": "ascendente", "value": "true", "disabled": true },
+                { "key": "categoria_id", "value": "{{categoria_id}}", "disabled": true },
+                { "key": "precio_min", "value": "1000", "disabled": true },
+                { "key": "precio_max", "value": "500000", "disabled": true }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Buscar por categoría",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/busqueda?categoria_id={{categoria_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["busqueda"],
+              "query": [
+                { "key": "categoria_id", "value": "{{categoria_id}}" }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Buscar ordenado por precio asc",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/busqueda?orden=precio&ascendente=true",
+              "host": ["{{base_url}}"],
+              "path": ["busqueda"],
+              "query": [
+                { "key": "orden", "value": "precio" },
+                { "key": "ascendente", "value": "true" }
+              ]
+            },
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Billetera",
+      "item": [
+        {
+          "name": "Ver saldo",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/billetera"
+          }
+        },
+        {
+          "name": "Cargar saldo",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/billetera/cargar",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monto\": 50000.00\n}"
+            }
+          }
+        },
+        {
+          "name": "Ver historial de transacciones",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/billetera/historial"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Carrito",
+      "item": [
+        {
+          "name": "Ver carrito",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/carrito"
+          }
+        },
+        {
+          "name": "Agregar item al carrito",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/carrito/items",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"producto_id\": \"{{producto_id}}\",\n  \"cantidad\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "Modificar cantidad de item",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/carrito/items/{{producto_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar item del carrito",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/carrito/items/{{producto_id}}"
+          }
+        },
+        {
+          "name": "Vaciar carrito",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/carrito"
+          }
+        },
+        {
+          "name": "Checkout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/carrito/checkout",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direccion_entrega\": \"Av. Rivadavia 1234, CABA\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Delivery",
+      "item": [
+        {
+          "name": "Listar deliveries pendientes",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/deliveries"
+          }
+        },
+        {
+          "name": "Mis deliveries asignados",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/deliveries/mis-asignados"
+          }
+        },
+        {
+          "name": "Obtener detalle de delivery",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/deliveries/{{delivery_id}}"
+          }
+        },
+        {
+          "name": "Tomar delivery",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/deliveries/{{delivery_id}}/tomar"
+          }
+        },
+        {
+          "name": "Marcar como entregado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/deliveries/{{delivery_id}}/entregar"
+          }
+        }
+      ]
+    }
+  ]
+}

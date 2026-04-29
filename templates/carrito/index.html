@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Carrito{% endblock %}
+{% block content %}
+
+<h2>Carrito de Compras</h2>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+{% if mensaje %}
+<div class="alert alert-success">{{ mensaje }}</div>
+{% endif %}
+
+{% if carrito and carrito['items'] %}
+<div class="row g-3">
+  <div class="col-md-8">
+    <table class="table table-bordered">
+      <thead class="table-dark">
+        <tr>
+          <th>Producto</th>
+          <th class="text-center">Cantidad</th>
+          <th class="text-end">Precio unit.</th>
+          <th class="text-end">Subtotal</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in carrito['items'] %}
+        <tr>
+          <td>{{ item.nombre_producto }}</td>
+          <td class="text-center">{{ item.cantidad }}</td>
+          <td class="text-end">$ {{ "%.2f"|format(item.precio_unitario) }}</td>
+          <td class="text-end fw-bold">$ {{ "%.2f"|format(item.subtotal) }}</td>
+          <td class="text-center">
+            <form method="post" action="/ui/carrito/items/{{ item.producto_id }}/eliminar">
+              <button class="btn btn-sm btn-outline-danger">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="table-light">
+          <td colspan="3" class="text-end fw-bold">Total:</td>
+          <td class="text-end fw-bold fs-5">$ {{ "%.2f"|format(carrito['total']) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <form method="post" action="/ui/carrito/vaciar" class="mb-3">
+      <button class="btn btn-outline-danger btn-sm"
+              onclick="return confirm('¿Vaciar el carrito?')">Vaciar carrito</button>
+    </form>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Checkout</h5>
+        <p class="text-muted small">Total: <strong>$ {{ "%.2f"|format(carrito['total']) }}</strong></p>
+        <form method="post" action="/ui/carrito/checkout">
+          <div class="mb-3">
+            <label class="form-label">Dirección de entrega *</label>
+            <input type="text" name="direccion_entrega" class="form-control"
+                   placeholder="Ej: Av. Corrientes 1234, CABA" required>
+          </div>
+          <button type="submit" class="btn btn-success w-100">Confirmar compra</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="text-center py-5">
+  <p class="text-muted fs-5">Tu carrito está vacío.</p>
+  <a href="/ui/busqueda" class="btn btn-primary">Ir a buscar productos</a>
+</div>
+{% endif %}
+
+{% endblock %}

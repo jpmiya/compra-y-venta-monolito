@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Productos{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Productos</h2>
+  <a href="/ui/productos/nuevo" class="btn btn-primary">+ Nuevo producto</a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if productos %}
+<table class="table table-bordered table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>Nombre</th>
+      <th>Categoría</th>
+      <th>Precio</th>
+      <th>Stock</th>
+      <th>SKU</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in productos %}
+    <tr>
+      <td>{{ p.nombre }}</td>
+      <td>{{ p.categoria.nombre if p.categoria else "—" }}</td>
+      <td>$ {{ "%.2f"|format(p.precio) }}</td>
+      <td>{{ p.stock }}</td>
+      <td><code>{{ p.sku }}</code></td>
+      <td>
+        <span class="badge {% if p.activo %}bg-success{% else %}bg-secondary{% endif %}">
+          {{ "activo" if p.activo else "inactivo" }}
+        </span>
+      </td>
+      <td>
+        <a href="/ui/productos/{{ p.id }}/editar" class="btn btn-sm btn-outline-secondary">Editar</a>
+        <form method="post" action="/ui/productos/{{ p.id }}/eliminar" class="d-inline"
+              onsubmit="return confirm('¿Dar de baja a {{ p.nombre }}?')">
+          <button class="btn btn-sm btn-outline-danger">Baja</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted">No hay productos registrados.</p>
+{% endif %}
+
+{% endblock %}

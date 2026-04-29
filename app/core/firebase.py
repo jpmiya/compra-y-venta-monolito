@@ -17,3 +17,8 @@ def _init() -> None:
 def verify_firebase_token(token: str) -> dict:
     _init()
     return firebase_auth.verify_id_token(token)
+
+
+def get_firebase_user(uid: str):
+    _init()
+    return firebase_auth.get_user(uid)
