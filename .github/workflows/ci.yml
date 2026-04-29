@@ -40,6 +40,7 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5433/compra_venta_db
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5433/compra_venta_test
           FIREBASE_SERVICE_ACCOUNT_PATH: ""
           ENCRYPTION_KEY: "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3Q="
         run: pytest tests/ -v
