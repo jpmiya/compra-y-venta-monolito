@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ async def listar_pendientes(db: AsyncSession) -> List[DeliveryOrder]:
 
 async def get_delivery_by_id(
     db: AsyncSession, delivery_id: uuid.UUID
-) -> DeliveryOrder | None:
+) -> Optional[DeliveryOrder]:
     result = await db.execute(
         select(DeliveryOrder).where(DeliveryOrder.id == delivery_id)
     )

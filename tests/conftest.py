@@ -1,43 +1,77 @@
+import asyncio
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from app.core.database import Base
 from app.core.dependencies import get_db
 from app.main import app
 from app.modules.admin.models import Direccion, Persona, Usuario
+from app.modules.notificaciones.models import Notificacion  # noqa: F401
 from app.modules.productos.models import Categoria, Producto
 
-TEST_DATABASE_URL = "postgresql+asyncpg://test:test@localhost:5432/compra_venta_test"
-
-_engine = create_async_engine(TEST_DATABASE_URL)
-_TestSession = async_sessionmaker(_engine, expire_on_commit=False)
-
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/compra_venta_test"
 TEST_FIREBASE_UID = "test-firebase-uid-001"
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db():
-    async with _engine.begin() as conn:
+async def _run_on_engine(coro_fn):
+    engine = create_async_engine(TEST_DATABASE_URL)
+    try:
+        async with engine.begin() as conn:
+            await coro_fn(conn)
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    """Crea las tablas una sola vez para toda la sesión de tests (sincrónico)."""
+    async def _create(conn):
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with _engine.begin() as conn:
+
+    async def _drop(conn):
         await conn.run_sync(Base.metadata.drop_all)
+
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(_run_on_engine(_create))
+    yield
+    loop.run_until_complete(_run_on_engine(_drop))
+    loop.close()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def limpiar_tablas():
+    yield
+    engine = create_async_engine(TEST_DATABASE_URL)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "TRUNCATE TABLE transacciones_billetera, billeteras, delivery_orders, "
+                    "carrito_items, carritos, resenas, productos, categorias, orden_items, "
+                    "ordenes, usuario_roles, usuarios, direcciones, personas, roles, "
+                    "notificaciones CASCADE"
+                )
+            )
+    finally:
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def db() -> AsyncSession:
-    async with _TestSession() as session:
+    engine = create_async_engine(TEST_DATABASE_URL)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
         yield session
-        await session.rollback()
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture
 async def usuario_test(db: AsyncSession) -> Usuario:
-    """Crea una Persona y Usuario de prueba con el UID de Firebase mockeado."""
     persona = Persona(
         nombre_completo="Usuario Test",
         documento_identidad="99999999",
@@ -59,23 +93,30 @@ async def usuario_test(db: AsyncSession) -> Usuario:
 
 
 @pytest_asyncio.fixture
-async def client(db: AsyncSession, usuario_test: Usuario) -> AsyncClient:
+async def client(usuario_test: Usuario) -> AsyncClient:
+    # Cada request del test recibe su propia sesión (igual que en producción)
+    request_engine = create_async_engine(TEST_DATABASE_URL)
+    request_session_factory = async_sessionmaker(request_engine, expire_on_commit=False)
+
     async def _override_db():
-        yield db
+        async with request_session_factory() as session:
+            yield session
 
     app.dependency_overrides[get_db] = _override_db
 
-    # Mockear verify_firebase_token para que devuelva el UID de prueba
     with patch(
-        "app.core.firebase.verify_firebase_token",
+        "app.core.dependencies.verify_firebase_token",
         return_value={"uid": TEST_FIREBASE_UID},
     ):
         async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"Authorization": f"Bearer {TEST_FIREBASE_UID}"},
         ) as ac:
             yield ac
 
     app.dependency_overrides.clear()
+    await request_engine.dispose()
 
 
 @pytest_asyncio.fixture

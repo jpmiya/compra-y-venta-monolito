@@ -1,14 +1,45 @@
 import logging
 import time
+from typing import Callable
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger("app")
+
+
+class LoggingMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        start = time.time()
+        status_code = 500
+
+        async def send_wrapper(message: dict) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+        duration = round((time.time() - start) * 1000)
+        logger.info(
+            "%s %s → %s (%dms)",
+            scope.get("method", ""),
+            scope.get("path", ""),
+            status_code,
+            duration,
+        )
 
 from app.modules.admin.router import router as admin_router
 from app.web.router import router as web_router
@@ -32,18 +63,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(LoggingMiddleware)
 
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start = time.time()
-    response = await call_next(request)
-    duration = round((time.time() - start) * 1000)
-    logger.info("%s %s → %s (%dms)", request.method, request.url.path, response.status_code, duration)
-    return response
-
-app.include_router(web_router)
 app.include_router(admin_router)
+app.include_router(web_router)
 app.include_router(productos_router)
 app.include_router(billetera_router)
 app.include_router(delivery_router)

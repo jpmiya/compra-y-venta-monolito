@@ -32,8 +32,12 @@ async def _cargar_carrito(db: AsyncSession, usuario_id: uuid.UUID) -> Carrito:
         carrito = Carrito(usuario_id=usuario_id)
         db.add(carrito)
         await db.commit()
-        await db.refresh(carrito)
-        carrito.items = []
+        result = await db.execute(
+            select(Carrito)
+            .options(selectinload(Carrito.items))
+            .where(Carrito.id == carrito.id)
+        )
+        carrito = result.scalar_one()
     return carrito
 
 
