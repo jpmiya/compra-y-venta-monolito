@@ -31,6 +31,38 @@ Al iniciar una sesión nueva, leer primero la sección "Estado Actual" de este a
 
 ## 📍 Estado Actual
 
+### Sesión 2026-04-28 — Iteración 7 (Nicolas)
+
+**Qué se hizo en esta sesión:**
+- Parámetros de configuración completos en `config.py` y `.env.example`: `SEGURIDAD_MAX_INTENTOS_LOGIN`, `SEGURIDAD_TIEMPO_SESION_MINUTOS`, `BUSQUEDA_MAX_RESULTADOS`, `NOTIFICACIONES_EMAIL_HABILITADO`, `NOTIFICACIONES_EMAIL_REMITENTE`, `FIREBASE_PROJECT_ID`.
+- README.md actualizado: stack correcto (Firebase en lugar de JWT), sección de autenticación, tabla completa de endpoints, instrucciones de configuración.
+- Fix búsqueda: filtro `stock > 0` agregado — solo devuelve productos con stock disponible.
+- Fix búsqueda: `ProductoResponse` ahora incluye `direccion_punto_venta` con datos completos (calle, ciudad, etc.) usando `selectinload`.
+- Migración Alembic inicial generada y aplicada (`alembic/versions/b946013361d1_initial_schema.py`). BD levantada con Docker en puerto 5433 (`postgres:15`, user: `postgres`, pass: `postgres`, DB: `compra_venta_db`).
+- Fix compatibilidad Python 3.9: reemplazado `X | None` por `Optional[X]` en todos los modelos y services.
+- Fix `alembic/env.py`: agregados imports de módulos `billetera` y `delivery`.
+- `BaseHTTPMiddleware` reemplazado por `LoggingMiddleware` puro (ASGI directo) — evitaba conflictos de event loop con asyncpg en tests.
+- Tests 27/27 pasando. Fixes al conftest: engine creado dentro del fixture (no a nivel módulo), sesión fresca por request en el cliente de test, mock de Firebase corregido (`app.core.dependencies` en lugar de `app.core.firebase`), orden de routers corregido (admin antes que web).
+
+**Estado de los tests:** 27/27 pasando ✅
+
+**Decisiones técnicas:**
+- Docker en puerto 5433 para la BD de test (puerto 5432 ocupado por PostgreSQL 18 instalado localmente).
+- Cada request en los tests recibe su propia sesión DB (igual que en producción) para evitar problemas de caché del identity map de SQLAlchemy.
+- `setup_db` es sincrónico (usa `asyncio.new_event_loop()`) para evitar conflictos de event loop entre fixtures de sesión y de función en pytest-asyncio.
+
+**Próximos pasos sugeridos:**
+1. Dockerfile + imagen Docker.
+2. Pipeline CI/CD.
+3. Colección Postman.
+4. Diagramas C4 y UML.
+
+**Problemas conocidos / deuda técnica:**
+- El módulo `ordenes` (Orden, OrdenItem) existe en el repo pero no es parte del TP — va a crear tablas extras en la migración. Se puede limpiar en algún momento.
+- Python 3.9 llegó a fin de vida (google-auth lanza warnings). Conviene migrar a Python 3.11+ en algún momento.
+
+---
+
 ### Sesión 2026-04-26 — Iteración 6 (Nicolas)
 
 **Qué se hizo en esta sesión:**
