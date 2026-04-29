@@ -52,14 +52,30 @@ Al iniciar una sesión nueva, leer primero la sección "Estado Actual" de este a
 - `setup_db` es sincrónico (usa `asyncio.new_event_loop()`) para evitar conflictos de event loop entre fixtures de sesión y de función en pytest-asyncio.
 
 **Próximos pasos sugeridos:**
-1. Dockerfile + imagen Docker.
-2. Pipeline CI/CD.
-3. Colección Postman.
-4. Diagramas C4 y UML.
+
+1. **Dockerfile** — crear `Dockerfile` en la raíz del proyecto para empaquetar la app. El enunciado pide que la imagen esté en GitLab. Usar imagen base `python:3.11-slim`, copiar el código, instalar dependencias, exponer puerto 8000, comando: `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+
+2. **Pipeline CI/CD** — crear `.gitlab-ci.yml` (o `.github/workflows/ci.yml` si se usa GitHub). Debe correr los tests automáticamente en cada push. Para los tests necesita un PostgreSQL de servicio en el pipeline.
+
+3. **Colección Postman** — crear y exportar una colección Postman con todos los endpoints del sistema. Incluir autenticación via Firebase ID Token en el header `Authorization: Bearer <token>`. El enunciado la pide explícitamente en la sección 6.3.
+
+4. **Diagramas C4 y UML** — el enunciado pide diagrama de contexto, contenedores y componentes incluyendo Firebase. Guardarlos en un directorio `/docs/diagramas/` en el repo y referenciarlos desde el README.
+
+5. **Levantar la BD y correr migraciones** — si Juampi levanta en su entorno, los comandos son:
+   ```bash
+   # Con Docker:
+   docker run -d --name postgres-compraventa -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=compra_venta_db -p 5433:5432 postgres:15
+   # Migrar:
+   alembic upgrade head
+   # Correr tests:
+   pytest tests/ -v
+   ```
+   La BD de test también necesita existir: `CREATE DATABASE compra_venta_test;`
 
 **Problemas conocidos / deuda técnica:**
-- El módulo `ordenes` (Orden, OrdenItem) existe en el repo pero no es parte del TP — va a crear tablas extras en la migración. Se puede limpiar en algún momento.
-- Python 3.9 llegó a fin de vida (google-auth lanza warnings). Conviene migrar a Python 3.11+ en algún momento.
+- El módulo `ordenes` (Orden, OrdenItem) existe en el repo pero no es parte del TP — genera tablas extras en la migración. Se puede eliminar si molesta.
+- Python 3.9 llegó a fin de vida (google-auth lanza FutureWarning en los tests). Conviene migrar a Python 3.11+ cuando haya tiempo.
+- El `ENCRYPTION_KEY` en `.env` debe generarse con: `python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"`. Sin esa variable los datos sensibles se guardan en texto plano (funciona pero no es seguro).
 
 ---
 
