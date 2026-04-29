@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: compra_venta_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/compra_venta_db
+      FIREBASE_SERVICE_ACCOUNT_PATH: ./firebase-service-account.json
+      FIREBASE_WEB_API_KEY: ${FIREBASE_WEB_API_KEY:-}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      SEGURIDAD_MAX_INTENTOS_LOGIN: "5"
+      SEGURIDAD_TIEMPO_SESION_MINUTOS: "60"
+      BILLETERA_LIMITE_CARGA: "100000"
+      BILLETERA_MONEDA: ARS
+      BUSQUEDA_MAX_RESULTADOS: "100"
+      NOTIFICACIONES_EMAIL_HABILITADO: "false"
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+
+volumes:
+  postgres_data:

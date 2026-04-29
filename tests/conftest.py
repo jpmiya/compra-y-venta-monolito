@@ -14,7 +14,7 @@ from app.modules.admin.models import Direccion, Persona, Usuario
 from app.modules.notificaciones.models import Notificacion  # noqa: F401
 from app.modules.productos.models import Categoria, Producto
 
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/compra_venta_test"
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:pass123@localhost:5433/compra_venta_test"
 TEST_FIREBASE_UID = "test-firebase-uid-001"
 
 

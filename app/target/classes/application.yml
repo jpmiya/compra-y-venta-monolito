@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: compra-venta-monolito
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  security:
+    max-login-attempts: 5
+    session-timeout-minutes: 60
+    admin-uids: ${APP_SECURITY_ADMIN_UIDS:}
+  wallet:
+    currency: ARS
+    max-balance: 10000000
+  search:
+    max-results: 50
+  notifications:
+    enabled: true
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID}
+    issuer-uri: ${FIREBASE_ISSUER_URI}
+    jwk-set-uri: ${FIREBASE_JWK_SET_URI}
+  crypto:
+    master-key-base64: ${APP_CRYPTO_MASTER_KEY_BASE64}
+    hash-salt: ${APP_CRYPTO_HASH_SALT}

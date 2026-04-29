@@ -1,0 +1,27 @@
+{
+  "groups": [
+    {
+      "name": "app.firebase",
+      "type": "org.example.app.config.FirebaseProperties",
+      "sourceType": "org.example.app.config.FirebaseProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.firebase.issuer-uri",
+      "type": "java.lang.String",
+      "sourceType": "org.example.app.config.FirebaseProperties"
+    },
+    {
+      "name": "app.firebase.jwk-set-uri",
+      "type": "java.lang.String",
+      "sourceType": "org.example.app.config.FirebaseProperties"
+    },
+    {
+      "name": "app.firebase.project-id",
+      "type": "java.lang.String",
+      "sourceType": "org.example.app.config.FirebaseProperties"
+    }
+  ],
+  "hints": []
+}

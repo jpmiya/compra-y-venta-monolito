@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+app:
+  security:
+    admin-uids: test-admin-uid
+  firebase:
+    project-id: test-project
+    issuer-uri: https://securetoken.google.com/test-project
+    jwk-set-uri: https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com
+  crypto:
+    master-key-base64: MDEyMzQ1Njc4OWFiY2RlZg==
+    hash-salt: test-salt
