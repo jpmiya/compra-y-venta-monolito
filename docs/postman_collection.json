@@ -5,7 +5,8 @@
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:8000" },
-    { "key": "token", "value": "PEGAR_FIREBASE_ID_TOKEN_ACA" },
+    { "key": "firebase_api_key", "value": "AIzaSyDb4kQxkCgvXiElypMHhVIzjrpXOqbP7YU" },
+    { "key": "token", "value": "" },
     { "key": "persona_id", "value": "" },
     { "key": "usuario_id", "value": "" },
     { "key": "direccion_id", "value": "" },
@@ -18,6 +19,88 @@
     "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
   },
   "item": [
+    {
+      "name": "00 - Auth",
+      "item": [
+        {
+          "name": "Login con Firebase (obtener token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "    pm.collectionVariables.set('token', res.idToken);",
+                  "    console.log('Token guardado en {{token}}');",
+                  "} else {",
+                  "    console.error('Login fallido:', res.error && res.error.message);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{firebase_api_key}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:signInWithPassword"],
+              "query": [{ "key": "key", "value": "{{firebase_api_key}}" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"juan@test.com\",\n  \"password\": \"pass123\",\n  \"returnSecureToken\": true\n}"
+            },
+            "description": "Hace login contra Firebase y guarda el idToken automáticamente en la variable {{token}} de la colección. Reemplazá email y password con tus credenciales de Firebase Authentication."
+          }
+        },
+        {
+          "name": "Refresh token (si expiró)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.id_token) {",
+                  "    pm.collectionVariables.set('token', res.id_token);",
+                  "    console.log('Token renovado y guardado en {{token}}');",
+                  "} else {",
+                  "    console.error('Refresh fallido:', JSON.stringify(res));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": {
+              "raw": "https://securetoken.googleapis.com/v1/token?key={{firebase_api_key}}",
+              "protocol": "https",
+              "host": ["securetoken", "googleapis", "com"],
+              "path": ["v1", "token"],
+              "query": [{ "key": "key", "value": "{{firebase_api_key}}" }]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "refresh_token" },
+                { "key": "refresh_token", "value": "PEGAR_REFRESH_TOKEN_ACA" }
+              ]
+            },
+            "description": "Los ID tokens de Firebase duran 1 hora. Si el token expiró, pegá el refresh_token (que devuelve el Login) y corré este request para renovarlo sin volver a poner contraseña."
+          }
+        }
+      ]
+    },
     {
       "name": "01 - Personas",
       "item": [
@@ -86,7 +169,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"juan@example.com\",\n  \"firebase_uid\": \"FIREBASE_UID_DEL_USUARIO\"\n}"
+              "raw": "{\n  \"email\": \"juan@test.com\",\n  \"firebase_uid\": \"FKXmWKkir1MPyeu6uve2ZTfjCwO2\"\n}"
             }
           }
         },

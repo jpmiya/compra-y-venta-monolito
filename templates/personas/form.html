@@ -11,7 +11,7 @@
     {% endif %}
 
     <form method="post"
-          action="{% if persona %}/personas/{{ persona.id }}/editar{% else %}/personas/nueva{% endif %}">
+          action="{% if persona %}/ui/personas/{{ persona.id }}/editar{% else %}/ui/personas/nueva{% endif %}">
 
       <div class="mb-3">
         <label class="form-label">Nombre completo *</label>
@@ -50,7 +50,7 @@
 
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">Guardar</button>
-        <a href="/personas" class="btn btn-outline-secondary">Cancelar</a>
+        <a href="/ui/personas" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
   </div>

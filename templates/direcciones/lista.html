@@ -4,7 +4,7 @@
 
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="/personas">Personas</a></li>
+    <li class="breadcrumb-item"><a href="/ui/personas">Personas</a></li>
     <li class="breadcrumb-item active">{{ persona.nombre_completo }} — Direcciones</li>
   </ol>
 </nav>
@@ -32,8 +32,8 @@
       <td>{{ d.provincia }}</td>
       <td>{{ d.descripcion or "—" }}</td>
       <td>
-        <a href="/direcciones/{{ d.id }}/editar" class="btn btn-sm btn-outline-secondary">Editar</a>
-        <form method="post" action="/direcciones/{{ d.id }}/eliminar" class="d-inline"
+        <a href="/ui/direcciones/{{ d.id }}/editar" class="btn btn-sm btn-outline-secondary">Editar</a>
+        <form method="post" action="/ui/direcciones/{{ d.id }}/eliminar" class="d-inline"
               onsubmit="return confirm('¿Eliminar esta dirección?')">
           <button class="btn btn-sm btn-outline-danger">Eliminar</button>
         </form>
@@ -48,7 +48,7 @@
 
 <hr>
 <h5>Agregar dirección</h5>
-<form method="post" action="/personas/{{ persona.id }}/direcciones/nueva" class="row g-3">
+<form method="post" action="/ui/personas/{{ persona.id }}/direcciones/nueva" class="row g-3">
   <div class="col-md-4">
     <label class="form-label">Calle *</label>
     <input type="text" name="calle" class="form-control" required>

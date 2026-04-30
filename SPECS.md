@@ -31,6 +31,41 @@ Al iniciar una sesión nueva, leer primero la sección "Estado Actual" de este a
 
 ## 📍 Estado Actual
 
+### Sesión 2026-04-30 — Iteración 8 (Juampi) — **PROYECTO COMPLETO ✅**
+
+**Qué se hizo en esta sesión:**
+- Entorno local levantado: Docker PostgreSQL en puerto 5433, password `pass123`, `.env` configurado con credenciales reales de Firebase.
+- UI web completa con Jinja2 + Bootstrap 5, renderizado server-side:
+  - Login con Firebase (email/password), auto-registro de primer acceso (`/web/registro`) con nombre, documento, fecha_nacimiento, teléfono.
+  - Dashboard con stats (personas, productos, deliveries, saldo).
+  - ABM Personas, Usuarios por persona, Direcciones por persona.
+  - ABM Productos.
+  - Búsqueda de productos con "Agregar al carrito".
+  - Carrito con checkout.
+  - Billetera virtual.
+  - Vista de Deliveries (pendientes + asignados).
+- Todas las rutas web bajo prefijo `/ui/` para no colisionar con los API routers (`/personas`, `/productos`, etc.).
+- Fix: `carrito['items']` y `carrito['total']` en el template (Jinja2 resuelve `.items` como método de dict).
+- Dockerfile + docker-compose creados y funcionales.
+- Pipeline GitHub Actions (`.github/workflows/ci.yml`) corriendo tests en cada push.
+- Colección Postman (`docs/postman_collection.json`) con carpeta `00 - Auth` que llama a la REST API de Firebase, guarda el `idToken` automáticamente en `{{token}}` via test script, y tiene bodies de ejemplo en todos los endpoints POST/PUT.
+- Diagramas C4 (contexto, contenedores, componentes) y UML (modelo de datos, secuencia compra, secuencia entrega) en `docs/diagramas/`.
+
+**Estado de los tests:** 27/27 pasando ✅
+
+**Decisiones técnicas:**
+- Rutas web prefijadas con `/ui/` — evita conflicto con `admin_router` que registra `GET /personas` (requiere Bearer token). Las rutas API originales no fueron modificadas.
+- Auto-registro: si un usuario pasa la verificación de Firebase pero no existe en la BD local, se lo redirige a `/web/registro` donde completa sus datos. Esto permite el primer acceso sin intervención manual.
+- La colección Postman usa `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword` con email `juan@test.com` / `pass123` y Firebase API key del proyecto.
+
+**Próximos pasos:** Ninguno — TP1 completo.
+
+**Problemas conocidos / deuda técnica:**
+- El módulo `ordenes` existe en el repo pero no es parte del TP — genera tablas extras en la migración.
+- Python 3.9 llegó a fin de vida (google-auth lanza FutureWarning en los tests). No afecta funcionalidad.
+
+---
+
 ### Sesión 2026-04-28 — Iteración 7 (Nicolas)
 
 **Qué se hizo en esta sesión:**
@@ -648,66 +683,66 @@ El archivo `firebase-service-account.json` **no se commitea** (está en `.gitign
 
 ## 9. Entregables Requeridos por el Enunciado
 
-- [ ] **Modelo C4** — diagramas de contexto, contenedores y componentes (incluyendo Firebase)
-- [ ] **Diagramas UML** — directorio en el repositorio con diagramas del sistema
-- [ ] **README.md** — estructurado con instrucciones de setup
-- [ ] **Repositorio GitLab** — código fuente + imagen Docker
-- [ ] **Scripts de BD** — estructura de personas, usuarios, roles, direcciones, productos
-- [ ] **Archivo de configuración** — `.env.example` con todas las variables incluyendo Firebase
-- [ ] **Pipeline CI/CD**
-- [ ] **Swagger/OpenAPI** — documentación de API (automática con FastAPI en `/docs`)
-- [ ] **Colección Postman** — con autenticación via Firebase ID Token
+- [x] **Modelo C4** — diagramas de contexto, contenedores y componentes (incluyendo Firebase)
+- [x] **Diagramas UML** — directorio en el repositorio con diagramas del sistema
+- [x] **README.md** — estructurado con instrucciones de setup
+- [x] **Repositorio GitLab** — código fuente + imagen Docker
+- [x] **Scripts de BD** — estructura de personas, usuarios, roles, direcciones, productos
+- [x] **Archivo de configuración** — `.env.example` con todas las variables incluyendo Firebase
+- [x] **Pipeline CI/CD**
+- [x] **Swagger/OpenAPI** — documentación de API (automática con FastAPI en `/docs`)
+- [x] **Colección Postman** — con autenticación via Firebase ID Token
 
 ---
 
 ## 10. Checklist de Implementación
 
 ### Módulo: Administración (Personas, Usuarios, Direcciones)
-- [ ] Modelos en BD (Persona, Usuario, Rol, Dirección)
-- [ ] Integración Firebase Admin SDK (verificación de token)
-- [ ] Endpoints ABM Personas
-- [ ] Endpoints ABM Usuarios (con Firebase UID)
-- [ ] Endpoints ABM Direcciones
-- [ ] Validaciones
-- [ ] Tests
+- [x] Modelos en BD (Persona, Usuario, Rol, Dirección)
+- [x] Integración Firebase Admin SDK (verificación de token)
+- [x] Endpoints ABM Personas
+- [x] Endpoints ABM Usuarios (con Firebase UID)
+- [x] Endpoints ABM Direcciones
+- [x] Validaciones
+- [x] Tests
 
 ### Módulo: Productos
-- [ ] Modelo Producto (con relación a Dirección punto de venta)
-- [ ] Catálogo de categorías predefinido
-- [ ] CRUD de productos
-- [ ] Validaciones
-- [ ] Tests
+- [x] Modelo Producto (con relación a Dirección punto de venta)
+- [x] Catálogo de categorías predefinido
+- [x] CRUD de productos
+- [x] Validaciones
+- [x] Tests
 
 ### Módulo: Búsqueda
-- [ ] Endpoint de búsqueda con filtros y ordenamiento
-- [ ] Tests
+- [x] Endpoint de búsqueda con filtros y ordenamiento
+- [x] Tests
 
 ### Módulo: Billetera Virtual
-- [ ] Modelos (BilleteraVirtual, TransaccionBilletera)
-- [ ] Ver saldo
-- [ ] Cargar saldo
-- [ ] Historial de transacciones
-- [ ] Validaciones (límite de carga, saldo no negativo)
-- [ ] Tests
+- [x] Modelos (BilleteraVirtual, TransaccionBilletera)
+- [x] Ver saldo
+- [x] Cargar saldo
+- [x] Historial de transacciones
+- [x] Validaciones (límite de carga, saldo no negativo)
+- [x] Tests
 
 ### Módulo: Carrito + Checkout
-- [ ] Modelos (Carrito, CarritoItem)
-- [ ] CRUD carrito
-- [ ] Proceso de checkout (transacción atómica)
-- [ ] Validaciones (stock, saldo billetera)
-- [ ] Tests
+- [x] Modelos (Carrito, CarritoItem)
+- [x] CRUD carrito
+- [x] Proceso de checkout (transacción atómica)
+- [x] Validaciones (stock, saldo billetera)
+- [x] Tests
 
 ### Módulo: Delivery
-- [ ] Modelo DeliveryOrder
-- [ ] Listar pendientes
-- [ ] Tomar delivery
-- [ ] Marcar entregado
-- [ ] Validaciones de estados
-- [ ] Tests
+- [x] Modelo DeliveryOrder
+- [x] Listar pendientes
+- [x] Tomar delivery
+- [x] Marcar entregado
+- [x] Validaciones de estados
+- [x] Tests
 
 ### Infraestructura
-- [ ] Dockerfile
-- [ ] Pipeline CI/CD
-- [ ] Alembic migrations
-- [ ] Colección Postman
-- [ ] Diagramas C4 y UML
+- [x] Dockerfile
+- [x] Pipeline CI/CD
+- [x] Alembic migrations
+- [x] Colección Postman
+- [x] Diagramas C4 y UML

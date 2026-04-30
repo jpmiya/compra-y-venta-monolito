@@ -4,7 +4,7 @@
 
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="/personas">Personas</a></li>
+    <li class="breadcrumb-item"><a href="/ui/personas">Personas</a></li>
     <li class="breadcrumb-item active">{{ persona.nombre_completo }} — Usuarios</li>
   </ol>
 </nav>
@@ -38,7 +38,7 @@
         </span>
       </td>
       <td>
-        <form method="post" action="/usuarios/{{ u.id }}/eliminar" class="d-inline"
+        <form method="post" action="/ui/usuarios/{{ u.id }}/eliminar" class="d-inline"
               onsubmit="return confirm('¿Dar de baja a {{ u.email }}?')">
           <button class="btn btn-sm btn-outline-danger">Baja</button>
         </form>
@@ -53,7 +53,7 @@
 
 <hr>
 <h5>Agregar usuario</h5>
-<form method="post" action="/personas/{{ persona.id }}/usuarios/nuevo" class="row g-3">
+<form method="post" action="/ui/personas/{{ persona.id }}/usuarios/nuevo" class="row g-3">
   <div class="col-md-4">
     <label class="form-label">Email</label>
     <input type="email" name="email" class="form-control" required>
