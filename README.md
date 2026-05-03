@@ -45,6 +45,34 @@ Documentación interactiva disponible en `http://localhost:8000/docs`.
 
 ---
 
+## Documentación
+
+| Recurso | Ubicación |
+|---------|-----------|
+| Swagger / OpenAPI | `http://localhost:8000/docs` (servidor corriendo) |
+| Colección Postman | [`docs/postman_collection.json`](docs/postman_collection.json) |
+| Diagramas C4 y UML | [`docs/diagramas/`](docs/diagramas/README.md) |
+
+### Colección Postman
+
+Importar el archivo `docs/postman_collection.json` en Postman. Incluye carpetas para cada módulo:
+
+- `00 - Auth` — obtención del token Firebase
+- `01 - Personas` / `02 - Usuarios` / `03 - Direcciones`
+- `04 - Productos` / `05 - Búsqueda`
+- `06 - Billetera` / `07 - Carrito` / `08 - Delivery`
+
+Configurar la variable de entorno `base_url` con `http://localhost:8000` y `token` con el ID token de Firebase.
+
+### Diagramas
+
+Están en `docs/diagramas/` como archivos Markdown con diagramas Mermaid:
+
+- **C4:** Contexto, Contenedores, Componentes
+- **UML:** Modelo de datos, Secuencia de compra, Secuencia de entrega
+
+---
+
 ## Variables de entorno (.env)
 
 ```env
