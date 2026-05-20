@@ -22,10 +22,14 @@ CODIGOS_DESCUENTO: dict[str, float] = {
 
 
 async def _cargar_carrito(db: AsyncSession, usuario_id: uuid.UUID) -> Carrito:
+    # populate_existing fuerza el refresh de la colección items aunque el Carrito
+    # ya esté en el identity map (evita ver una vista cacheada vacía tras
+    # agregar/eliminar items en la misma sesión).
     result = await db.execute(
         select(Carrito)
         .options(selectinload(Carrito.items))
         .where(Carrito.usuario_id == usuario_id)
+        .execution_options(populate_existing=True)
     )
     carrito = result.scalar_one_or_none()
     if not carrito:
@@ -36,6 +40,7 @@ async def _cargar_carrito(db: AsyncSession, usuario_id: uuid.UUID) -> Carrito:
             select(Carrito)
             .options(selectinload(Carrito.items))
             .where(Carrito.id == carrito.id)
+            .execution_options(populate_existing=True)
         )
         carrito = result.scalar_one()
     return carrito

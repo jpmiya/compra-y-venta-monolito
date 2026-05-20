@@ -64,7 +64,11 @@ async def listar_productos(
 
 
 async def get_producto_by_id(db: AsyncSession, producto_id: uuid.UUID) -> Optional[Producto]:
-    result = await db.execute(select(Producto).where(Producto.id == producto_id))
+    result = await db.execute(
+        select(Producto)
+        .options(selectinload(Producto.direccion_punto_venta))
+        .where(Producto.id == producto_id)
+    )
     return result.scalar_one_or_none()
 
 
@@ -100,7 +104,7 @@ async def crear_producto(db: AsyncSession, data: ProductoCreate, vendedor: Usuar
     )
     db.add(producto)
     await db.commit()
-    await db.refresh(producto)
+    await db.refresh(producto, attribute_names=["direccion_punto_venta"])
     return producto
 
 
@@ -110,7 +114,7 @@ async def actualizar_producto(
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(producto, field, value)
     await db.commit()
-    await db.refresh(producto)
+    await db.refresh(producto, attribute_names=["direccion_punto_venta"])
     return producto
 
 
