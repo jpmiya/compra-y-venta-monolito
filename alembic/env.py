@@ -11,7 +11,6 @@ from app.core.database import Base
 import app.modules.admin.models  # noqa: F401
 import app.modules.productos.models  # noqa: F401
 import app.modules.carrito.models  # noqa: F401
-import app.modules.ordenes.models  # noqa: F401
 import app.modules.notificaciones.models  # noqa: F401
 import app.modules.billetera.models  # noqa: F401
 import app.modules.delivery.models  # noqa: F401

@@ -47,7 +47,6 @@ from app.modules.billetera.router import router as billetera_router
 from app.modules.busqueda.router import router as busqueda_router
 from app.modules.delivery.router import router as delivery_router
 from app.modules.carrito.router import router as carrito_router
-from app.modules.ordenes.router import router as ordenes_router
 from app.modules.productos.router import router as productos_router
 
 app = FastAPI(
@@ -71,7 +70,6 @@ app.include_router(productos_router)
 app.include_router(billetera_router)
 app.include_router(delivery_router)
 app.include_router(carrito_router)
-app.include_router(ordenes_router)
 app.include_router(busqueda_router)
 
 

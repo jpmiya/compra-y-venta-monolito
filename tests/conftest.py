@@ -56,8 +56,8 @@ async def limpiar_tablas():
             await conn.execute(
                 text(
                     "TRUNCATE TABLE transacciones_billetera, billeteras, delivery_orders, "
-                    "carrito_items, carritos, resenas, productos, categorias, orden_items, "
-                    "ordenes, usuario_roles, usuarios, direcciones, personas, roles, "
+                    "carrito_items, carritos, resenas, productos, categorias, "
+                    "usuario_roles, usuarios, direcciones, personas, roles, "
                     "notificaciones CASCADE"
                 )
             )

@@ -15,6 +15,22 @@ Misma convención que `SPECS.md`. El proyecto lo desarrollan dos personas (Juamp
 ### Regla principal
 **Antes de cada `git push`, el agente activo actualiza la sección "Estado Actual" de este archivo** con qué se implementó, estado de tests, decisiones técnicas y próximos pasos.
 
+### Definición de Hecho (DoD) — al cerrar cada desarrollo/etapa
+Ninguna etapa se considera terminada hasta que:
+1. **Se prueba todo** (`pytest tests/ -v` completo, no solo los tests nuevos) y queda **verde**. Si el test DB no está levantado, se levanta primero (ver "Correr los tests" abajo) — no vale saltear con `--collect-only`.
+2. **Segunda chequeada** de lo recién hecho: releer el diff y contrastarlo contra lo que la etapa pedía (este archivo + `PLAN_MIGRACION_MICROSERVICIOS.md`), verificando que sea **congruente** con el objetivo (nada de más, nada de menos, sin efectos colaterales no buscados).
+3. Recién ahí se actualiza "Estado Actual" y se commitea/pushea.
+
+### Correr los tests (Docker — vía oficial del enunciado)
+El proyecto **usa Docker** (directiva del enunciado). El `docker-compose.yml` incluye un servicio `test-db` que matchea el default de `tests/conftest.py` (`localhost:5433`, db `compra_venta_test`, pass `pass123`), así `pytest` corre sin setear nada. El schema lo crea `conftest.py` con `Base.metadata.create_all` (no hace falta alembic).
+```bash
+docker compose up -d test-db      # levanta el Postgres de tests en :5433
+pytest tests/ -v                  # usa el default de conftest, sin env vars
+docker compose stop test-db       # (opcional) apagar al terminar
+```
+
+> **Fallback sin Docker** (solo si Docker no está disponible en la máquina): usar el Postgres nativo en `localhost:5432` creando `compra_venta_test` ahí y apuntando `TEST_DATABASE_URL` a ese puerto. Es un workaround para validar código, **no** la vía oficial.
+
 ### Cómo leer este archivo (para el agente que retoma)
 1. Leer **primero** la sección "Estado Actual" de acá.
 2. Leer `PLAN_MIGRACION_MICROSERVICIOS.md` para el diseño detallado (acoplamiento medido, saga, FKs cross-servicio, gaps de coherencia detectados).
@@ -28,29 +44,41 @@ Misma convención que `SPECS.md`. El proyecto lo desarrollan dos personas (Juamp
 
 ## 📍 Estado Actual
 
-### Sesión 2026-07-13 — Etapa 2 arranca (Juampi) — **DISEÑO LISTO, IMPLEMENTACIÓN NO INICIADA**
+### Sesión 2026-07-16 — Etapa 0 arranca (Juampi) — **LIMPIEZA INICIADA**
+
+**Qué se hizo en esta sesión:**
+- **Módulo `ordenes` eliminado** (primer ítem de la Etapa 0): borrado `app/modules/ordenes/`, sacado del `main.py` (import + `include_router`), del `alembic/env.py` y del TRUNCATE de `tests/conftest.py`. Nueva migración `d2e4f6a8b0c1_drop_ordenes` que dropea `orden_items`/`ordenes` + el enum `estado_orden_enum` (reversible).
+- **Python 3.11 confirmado** (Dockerfile ya en `python:3.11-slim`; venv local 3.11.6). Ítem del checklist marcado.
+- **Verificación:** suite completa **63/63 verde** contra el Postgres nativo 5432 (db `compra_venta_test`). `import app.main` OK sin rutas `/ordenes`. Cambio congruente con el objetivo de la Etapa 0 (solo elimina `ordenes`, sin efectos colaterales).
+
+### Sesión 2026-07-13 — Etapa 2 arranca (Juampi) — **DISEÑO LISTO**
 
 **Qué hay hasta acá:**
-- **Monolito TP1 completo** (27/27 tests). Ver `SPECS.md`.
+- **Monolito TP1 completo**. Ver `SPECS.md`.
 - **Diseño de microservicios terminado en papel** (dos TPs): 5 bounded contexts hexagonales + saga de checkout orquestada. PDFs en la raíz.
-- **Plan de migración creado** (`PLAN_MIGRACION_MICROSERVICIOS.md`): evaluación de dificultad (MEDIA), acoplamiento real medido en el código, orden de extracción incremental, y dos gaps de coherencia detectados en los propios TPs (ver abajo).
+- **Plan de migración creado** (`PLAN_MIGRACION_MICROSERVICIOS.md`): evaluación de dificultad (MEDIA), acoplamiento real medido en el código, orden de extracción incremental, y gaps de coherencia resueltos por el rediseño (ver abajo).
 
-**Estado de los tests:** 27/27 pasando (los del monolito). Sin tests de microservicios todavía.
+**Estado de los tests:** los del monolito (menos los de `ordenes`, que no existían). Sin tests de microservicios todavía.
 
 **Decisiones técnicas tomadas en esta etapa:**
-- **Message broker: RabbitMQ.** Es el que más directo calza con el modelo command channel + reply channel del TP (el TP lo deja agnóstico: Rabbit/Kafka/SQS).
+- **Todo hexagonal (ports & adapters).** Cada microservicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.
+- **Comunicación sincrónica salvo Delivery.** Los pasos de la saga que bloquean la respuesta del checkout (ReservarStock, DebitarSaldo, DescontarStock, vaciarCarrito) van por **conexión sincrónica REST/RPC** — el checkout espera a todos igual, las colas async no aportan. **Solo Delivery es asincrónico.**
+- **Message broker: RabbitMQ — solo para el delivery async**, con **canales de respuesta múltiples** (uno por participante/flujo), no una única cola general de respuestas.
+- **Pivote = `DebitarSaldo`** (Billetera), no `CrearDeliveries`. Al ser Delivery async con retry, ya no puede ser el go/no-go.
+- **Log local de deliverys** en Carrito (outbox aplicado a delivery): registra los deliverys a enviar para decidir retry vs. no-retry.
 - **Migración incremental**, no big-bang: se extrae un servicio a la vez detrás del monolito-fachada, compilando y testeando en cada paso.
-- **Orden de extracción** (derivado del grafo de dependencias, §Arquitectura): Identidad → Billetera → Catálogo → Delivery → Carrito/Saga.
+- **Orden de extracción** (derivado del grafo de dependencias, §Arquitectura): Identidad, Billetera, Catálogo, Delivery, Carrito/Saga.
 
-**Gaps de coherencia a resolver antes de implementar** (detectados al cruzar los TPs con el código, ver plan §5.2.bis):
-- `DescontarStock` está en el hexágono de Catálogo pero la saga nunca lo invoca → falta definir cuándo se confirma la reserva.
-- `CancelarDeliveries` está en el hexágono de Delivery pero, siendo `CrearDeliveries` el pivote, ninguna rama lo dispara → definir o eliminar.
+**Gaps de coherencia — resueltos por el rediseño** (ver plan §5.2.bis):
+- `DescontarStock` ahora corre tras el pivote (paso 3) para confirmar la reserva de stock. Deja de estar sin uso.
+- `ReintegrarSaldo` queda muerto (el pivote `DebitarSaldo` no tiene compensación en la saga) → eliminar o dejar solo como operación administrativa.
+- `CancelarDeliveries` queda muerto (`CrearDeliveries` es async post-pivote con retry) → eliminar o reservar para cancelación administrativa.
 
-**Próximos pasos sugeridos:** empezar por la **Etapa 0** (limpieza + infra base) y luego **Identidad**. Ver Checklist más abajo.
+**Próximos pasos sugeridos:** correr `pytest` con el test DB arriba para confirmar verde tras sacar `ordenes`; luego seguir la **Etapa 0** (docker-compose con RabbitMQ + esqueleto hexagonal + base de log de deliverys/idempotencia) y arrancar **Identidad**. Ver Checklist.
 
 **Problemas conocidos / deuda técnica:**
-- Módulo `ordenes` a eliminar antes de cortar (acopla admin+carrito+productos, fuera del TP).
-- Python 3.9 EOL → subir a 3.11 para las imágenes de los servicios.
+- ~~Módulo `ordenes` a eliminar~~ → **hecho** (sesión 2026-07-16).
+- ~~Python 3.9 EOL~~ → **hecho** (Dockerfile en 3.11-slim).
 
 ---
 
@@ -63,11 +91,11 @@ Migrar el monolito de compra y venta a una arquitectura de **microservicios** (5
 ## 2. Alcance
 
 **Dentro:**
-- 5 microservicios: Identidad y Acceso, Catálogo, Carrito & Checkout, Billetera, Delivery.
+- 5 microservicios **hexagonales** (ports & adapters): Identidad y Acceso, Catálogo, Carrito & Checkout, Billetera, Delivery.
 - Base de datos propia por servicio.
-- FKs cross-módulo → referencia por ID + consistencia eventual.
-- Saga de checkout orquestada por Carrito & Checkout, con outbox e idempotencia.
-- Comunicación: REST síncrono (user/consultas) + RabbitMQ async (comandos/respuestas de la saga).
+- FKs cross-módulo pasan a referencia por ID + consistencia eventual.
+- Saga de checkout orquestada por Carrito & Checkout, con **log de deliverys** e idempotencia.
+- Comunicación: **REST/RPC sincrónico para todo** (consultas y pasos de la saga que bloquean la respuesta) + **RabbitMQ asincrónico solo para Delivery**, con canales de respuesta múltiples.
 
 **Fuera:**
 - `notificaciones`: no forma parte de la saga; queda como consumidor puro si más adelante se migra.
@@ -79,12 +107,14 @@ Migrar el monolito de compra y venta a una arquitectura de **microservicios** (5
 
 | Capa | Tecnología |
 |------|-----------|
+| Arquitectura por servicio | **Hexagonal (ports & adapters)** |
 | Base del servicio | Python 3.11 + FastAPI (igual que el monolito) |
 | BD por servicio | PostgreSQL (una instancia/DB por microservicio) |
-| **Message broker** | **RabbitMQ** (command channel + reply channel) |
+| Comunicación entre servicios | **REST/RPC sincrónico** para consultas y pasos de la saga que bloquean |
+| **Message broker** | **RabbitMQ — solo para Delivery async**, con canales de respuesta múltiples |
 | Orquestación local | Docker Compose (broker + N Postgres + N servicios) |
 | Fachada | API Gateway de cara al cliente |
-| Confiabilidad | Patrón Outbox + idempotencia por servicio |
+| Confiabilidad | **Log de deliverys** (retry) + idempotencia por servicio |
 | Auth | Firebase (sin cambios; cada servicio valida el Bearer) |
 
 ---
@@ -96,13 +126,13 @@ Detalle completo en `PLAN_MIGRACION_MICROSERVICIOS.md`. Resumen:
 | Servicio | Módulo(s) del monolito | Rol en la saga |
 |---|---|---|
 | **Identidad y Acceso** | `admin` | — (todos lo referencian por ID) |
-| **Catálogo** | `productos` + `busqueda` | `ReservarStock` / `LiberarStock` (compensatable) |
-| **Billetera** | `billetera` | `DebitarSaldo` / `ReintegrarSaldo` (compensatable) |
-| **Delivery** | `delivery` | `CrearDeliveries` (**pivote**) |
+| **Catálogo** | `productos` + `busqueda` | `ReservarStock` / `LiberarStock` (compensatable) + `DescontarStock` (confirma tras el pivote) |
+| **Billetera** | `billetera` | `DebitarSaldo` (**pivote**, go/no-go) |
+| **Delivery** | `delivery` | `CrearDeliveries` (**asincrónico** post-pivote, con log + retry) |
 | **Carrito & Checkout** | `carrito` | **Orquestador** (`CheckoutSaga`) + `vaciarCarrito` (retriable) |
 
-**Saga (camino feliz):** ReservarStock → DebitarSaldo → CrearDeliveries → vaciarCarrito → 200.
-**Compensaciones:** stock insuf. → 409; saldo insuf. → LiberarStock → 402; falla deliveries → ReintegrarSaldo + LiberarStock → 500.
+**Saga (camino feliz), en orden:** ReservarStock (sinc), luego DebitarSaldo (sinc, **pivote**), luego DescontarStock (sinc), luego CrearDeliveries (**async** con log + retry), luego vaciarCarrito (sinc), y responde 200.
+**Compensación:** stock insuf. devuelve 409; saldo insuf. dispara `LiberarStock` y devuelve 402. **No hay falla post-pivote** (Delivery es async con retry, no aborta la saga).
 
 ---
 
@@ -111,54 +141,55 @@ Detalle completo en `PLAN_MIGRACION_MICROSERVICIOS.md`. Resumen:
 > Extracción incremental: cada etapa queda funcionando (compilar + tests) antes de la siguiente. El monolito hace de fachada hasta que el servicio nuevo reemplaza al módulo viejo.
 
 ### Etapa 0 — Preparación e infra base
-- [ ] Eliminar módulo `ordenes` (código + tablas de la migración + router en `main.py`)
-- [ ] Subir a Python 3.11
-- [ ] `docker-compose` con RabbitMQ levantado
-- [ ] Definir contratos de mensajes (comandos y replies de la saga)
-- [ ] Base reutilizable de Outbox + tabla de idempotencia (mensajes procesados)
+- [x] Eliminar módulo `ordenes` (código + router en `main.py` + import en `alembic/env.py` + TRUNCATE de `conftest.py` + migración `d2e4f6a8b0c1` que dropea `orden_items`/`ordenes`)
+- [x] Subir a Python 3.11 (Dockerfile ya en `python:3.11-slim`; venv y CI corren 3.11.6)
+- [ ] `docker-compose` con RabbitMQ levantado (solo para el delivery async)
+- [ ] Definir esqueleto hexagonal reutilizable (puertos + adaptadores REST/persistencia)
+- [ ] Definir contratos: llamadas sincrónicas (REST) de los pasos de la saga + mensajes async de delivery con **canales de respuesta múltiples**
+- [ ] Base reutilizable de **log de deliverys** (retry) + tabla de idempotencia (mensajes procesados)
 
 ### Servicio 1 — Identidad y Acceso (`admin`)
-- [ ] Extraer a servicio con BD propia (personas, usuarios, roles, usuario_roles, direcciones)
+- [ ] Extraer a servicio hexagonal con BD propia (personas, usuarios, roles, usuario_roles, direcciones)
 - [ ] REST API: ABM + registro/auto-registro
 - [ ] Firebase Auth adapter (`verify_id_token`)
 - [ ] Endpoint de consulta de usuario/dirección por ID (para los demás servicios, síncrono REST)
 - [ ] Tests: dominio `admin` + mock de Firebase en el guard
 
-### Servicio 2 — Billetera (`billetera`)
-- [ ] Extraer a servicio con BD propia (billeteras, transacciones_billetera)
+### Servicio 2 — Billetera (`billetera`) — **pivote de la saga**
+- [ ] Extraer a servicio hexagonal con BD propia (billeteras, transacciones_billetera)
 - [ ] REST API: cargar / consultar saldo e historial
-- [ ] `Saldo command handler` ← Billetera cmd channel: `DebitarSaldo` / `ReintegrarSaldo` (idempotentes)
-- [ ] `DebitarSaldo` con commit propio (hoy `descontar_saldo` no commitea)
-- [ ] SagaReply: `SaldoDebitado` / `SaldoInsuficiente`
-- [ ] Tests: dominio + handlers
+- [ ] `DebitarSaldo` como endpoint **sincrónico** e idempotente (por `message_id`), con commit propio (hoy `descontar_saldo` no commitea) — es el **pivote** (go/no-go)
+- [ ] Respuesta sincrónica: saldo debitado OK / saldo insuficiente (dispara `LiberarStock` en el orquestador)
+- [ ] `ReintegrarSaldo`: **fuera de la saga** (queda muerto con el pivote actual) — eliminar o dejar como operación administrativa
+- [ ] Tests: dominio + handler `DebitarSaldo` (idempotencia)
 
 ### Servicio 3 — Catálogo (`productos` + `busqueda`)
-- [ ] Extraer a servicio con BD propia (productos, categorias, resenas)
+- [ ] Extraer a servicio hexagonal con BD propia (productos, categorias, resenas)
 - [ ] REST API: catálogo, búsqueda (stock > 0), reseñas
-- [ ] Resolver `validar_direccion_vendedor` (llamada síncrona a Identidad o réplica de direcciones)
+- [ ] Resolver `validar_direccion_vendedor` (llamada sincrónica a Identidad o réplica de direcciones)
 - [ ] Resolver el `selectinload(Producto.direccion_punto_venta)` cross-servicio
 - [ ] Introducir stock **reservado** vs **disponible**
-- [ ] `Stock command handler`: `ReservarStock` / `DescontarStock` / `LiberarStock` (idempotentes)
-- [ ] **Definir cuándo corre `DescontarStock`** (gap de coherencia, plan §5.2.bis)
-- [ ] SagaReply: `StockReservado` / `StockInsuficiente`
-- [ ] Tests: dominio + handlers `ReservarStock`/`LiberarStock`
+- [ ] Endpoints **sincrónicos** e idempotentes: `ReservarStock` (compensable) / `DescontarStock` (confirma tras el pivote) / `LiberarStock` (compensación)
+- [ ] `DescontarStock` corre como **paso 3** (tras `DebitarSaldo` OK) — gap resuelto (plan §5.2.bis)
+- [ ] Respuesta sincrónica: stock reservado OK / stock insuficiente (409)
+- [ ] Tests: dominio + `ReservarStock`/`LiberarStock`/`DescontarStock`
 
-### Servicio 4 — Delivery (`delivery`)
-- [ ] Extraer a servicio con BD propia (delivery_orders)
+### Servicio 4 — Delivery (`delivery`) — **asincrónico post-pivote**
+- [ ] Extraer a servicio hexagonal con BD propia (delivery_orders)
 - [ ] REST API: mis-asignados / tomar / entregar
-- [ ] `Delivery command handler`: `CrearDeliveries` (pivote)
-- [ ] **Decidir `CancelarDeliveries`** (gap de coherencia: queda muerto con el pivote actual, plan §5.2.bis)
-- [ ] SagaReply: `DeliveriesCreadas`
-- [ ] Tests: dominio + handler
+- [ ] `Delivery command handler` **asincrónico**: `CrearDeliveries` idempotente (consume de RabbitMQ; el orquestador lo respalda con el log de deliverys + retry)
+- [ ] Confirmación por **canal de respuesta propio** (no cola general): `DeliveriesCreadas`
+- [ ] `CancelarDeliveries`: **fuera de la saga** (queda muerto con delivery async + retry) — eliminar o dejar como operación administrativa
+- [ ] Tests: dominio + handler `CrearDeliveries` (idempotencia)
 
 ### Servicio 5 — Carrito & Checkout (`carrito`) — orquestador
-- [ ] Extraer a servicio con BD propia (carritos, carrito_items) + estado de saga
+- [ ] Extraer a servicio hexagonal con BD propia (carritos, carrito_items) + estado de saga + **log de deliverys**
 - [ ] REST API: operaciones del carrito + `checkout()`
-- [ ] `CheckoutSaga`: máquina de estados persistida (para compensar tras un crash)
-- [ ] Outbound command adapter → Catálogo / Billetera / Delivery cmd channels
-- [ ] SagaReply consumer ← Checkout saga reply channel
-- [ ] Compensaciones + códigos HTTP (409 / 402 / 500)
-- [ ] Tests: saga camino feliz + al menos un camino de compensación (TP2 §5, §7)
+- [ ] `CheckoutSaga`: máquina de estados persistida (para compensar `ReservarStock` si falla el débito, o retomar los pasos post-pivote tras un crash)
+- [ ] Adaptador de salida **sincrónico** (REST/RPC) a Catálogo (ReservarStock/DescontarStock) y Billetera (DebitarSaldo)
+- [ ] Adaptador de salida **asincrónico** a Delivery: persistir el **log de deliverys** y despachar con retry; consumir los **canales de respuesta múltiples**
+- [ ] Compensación (`LiberarStock`) + códigos HTTP (409 / 402)
+- [ ] Tests: saga camino feliz + compensación (saldo insuf. → `LiberarStock` → 402) + **retry de delivery** desde el log
 
 ### Infra transversal
 - [ ] API Gateway de cara al cliente
