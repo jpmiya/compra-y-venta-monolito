@@ -44,41 +44,37 @@ docker compose stop test-db       # (opcional) apagar al terminar
 
 ## 📍 Estado Actual
 
-### Sesión 2026-07-16 — Etapa 0 arranca (Juampi) — **LIMPIEZA INICIADA**
+> Snapshot de handoff entre agentes: **qué se hizo último** y **qué sigue**. Las **Decisiones vigentes** y la **Deuda técnica** son la referencia estable del diseño.
 
-**Qué se hizo en esta sesión:**
-- **Módulo `ordenes` eliminado** (primer ítem de la Etapa 0): borrado `app/modules/ordenes/`, sacado del `main.py` (import + `include_router`), del `alembic/env.py` y del TRUNCATE de `tests/conftest.py`. Nueva migración `d2e4f6a8b0c1_drop_ordenes` que dropea `orden_items`/`ordenes` + el enum `estado_orden_enum` (reversible).
-- **Python 3.11 confirmado** (Dockerfile ya en `python:3.11-slim`; venv local 3.11.6). Ítem del checklist marcado.
-- **Verificación:** suite completa **63/63 verde** contra el Postgres nativo 5432 (db `compra_venta_test`). `import app.main` OK sin rutas `/ordenes`. Cambio congruente con el objetivo de la Etapa 0 (solo elimina `ordenes`, sin efectos colaterales).
+### Último que se hizo
+- **Rediseño del diseño** (PLAN + SPECS): 7 correcciones → comunicación sincrónica salvo Delivery, pivote `DebitarSaldo`, log de deliverys, canales de respuesta múltiples, RabbitMQ solo para delivery, todo hexagonal, flechas fuera del diagrama. Gaps de coherencia resueltos.
+- **Etapa 0 (limpieza):** módulo `ordenes` eliminado (código + `main.py` + `alembic/env.py` + TRUNCATE de `conftest.py` + migración reversible `d2e4f6a8b0c1`). Python 3.11 confirmado (Dockerfile ya 3.11). `docker-compose.yml`: nuevo servicio `test-db` (5433, matchea el default de `conftest.py`).
+- **Proceso:** agregada la **DoD por etapa** (ver "Metodología").
+- **Verificación:** **63/63 verde** (corridos con el fallback nativo — en la máquina de escritorio no hay Docker). Commit `36ebc03` pusheado a `main`.
 
-### Sesión 2026-07-13 — Etapa 2 arranca (Juampi) — **DISEÑO LISTO**
+### Qué sigue
+1. **Re-verificar los tests por la vía Docker del enunciado:** `docker compose up -d test-db && pytest tests/ -v`.
+2. Completar el resto de la **Etapa 0**: RabbitMQ en `docker-compose` + esqueleto hexagonal reutilizable + base de log de deliverys/idempotencia.
+3. **Servicio 1: Identidad.**
 
-**Qué hay hasta acá:**
-- **Monolito TP1 completo**. Ver `SPECS.md`.
-- **Diseño de microservicios terminado en papel** (dos TPs): 5 bounded contexts hexagonales + saga de checkout orquestada. PDFs en la raíz.
-- **Plan de migración creado** (`PLAN_MIGRACION_MICROSERVICIOS.md`): evaluación de dificultad (MEDIA), acoplamiento real medido en el código, orden de extracción incremental, y gaps de coherencia resueltos por el rediseño (ver abajo).
-
-**Estado de los tests:** los del monolito (menos los de `ordenes`, que no existían). Sin tests de microservicios todavía.
-
-**Decisiones técnicas tomadas en esta etapa:**
-- **Todo hexagonal (ports & adapters).** Cada microservicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.
-- **Comunicación sincrónica salvo Delivery.** Los pasos de la saga que bloquean la respuesta del checkout (ReservarStock, DebitarSaldo, DescontarStock, vaciarCarrito) van por **conexión sincrónica REST/RPC** — el checkout espera a todos igual, las colas async no aportan. **Solo Delivery es asincrónico.**
-- **Message broker: RabbitMQ — solo para el delivery async**, con **canales de respuesta múltiples** (uno por participante/flujo), no una única cola general de respuestas.
+### Decisiones técnicas vigentes
+- **Todo hexagonal (ports & adapters).** Cada servicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.
+- **Comunicación sincrónica salvo Delivery.** Los pasos que bloquean la respuesta del checkout (ReservarStock, DebitarSaldo, DescontarStock, vaciarCarrito) van por **REST/RPC sincrónico** — se espera a todos igual, las colas async no aportan. **Solo Delivery es asincrónico.**
 - **Pivote = `DebitarSaldo`** (Billetera), no `CrearDeliveries`. Al ser Delivery async con retry, ya no puede ser el go/no-go.
 - **Log local de deliverys** en Carrito (outbox aplicado a delivery): registra los deliverys a enviar para decidir retry vs. no-retry.
-- **Migración incremental**, no big-bang: se extrae un servicio a la vez detrás del monolito-fachada, compilando y testeando en cada paso.
-- **Orden de extracción** (derivado del grafo de dependencias, §Arquitectura): Identidad, Billetera, Catálogo, Delivery, Carrito/Saga.
+- **RabbitMQ — solo para el delivery async**, con **canales de respuesta múltiples** (uno por participante/flujo), no una cola general única.
+- **Migración incremental**, no big-bang: un servicio a la vez detrás del monolito-fachada, compilando y testeando en cada paso.
+- **Orden de extracción** (del grafo de dependencias): Identidad, Billetera, Catálogo, Delivery, Carrito/Saga.
 
-**Gaps de coherencia — resueltos por el rediseño** (ver plan §5.2.bis):
-- `DescontarStock` ahora corre tras el pivote (paso 3) para confirmar la reserva de stock. Deja de estar sin uso.
-- `ReintegrarSaldo` queda muerto (el pivote `DebitarSaldo` no tiene compensación en la saga) → eliminar o dejar solo como operación administrativa.
+### Gaps de coherencia — resueltos por el rediseño (ver plan §5.2.bis)
+- `DescontarStock` corre tras el pivote (paso 3) para confirmar la reserva de stock. Deja de estar sin uso.
+- `ReintegrarSaldo` queda muerto (el pivote `DebitarSaldo` no se compensa) → eliminar o dejar como operación administrativa.
 - `CancelarDeliveries` queda muerto (`CrearDeliveries` es async post-pivote con retry) → eliminar o reservar para cancelación administrativa.
 
-**Próximos pasos sugeridos:** correr `pytest` con el test DB arriba para confirmar verde tras sacar `ordenes`; luego seguir la **Etapa 0** (docker-compose con RabbitMQ + esqueleto hexagonal + base de log de deliverys/idempotencia) y arrancar **Identidad**. Ver Checklist.
-
-**Problemas conocidos / deuda técnica:**
-- ~~Módulo `ordenes` a eliminar~~ → **hecho** (sesión 2026-07-16).
+### Deuda técnica / problemas conocidos
+- ~~Módulo `ordenes` a eliminar~~ → **hecho**.
 - ~~Python 3.9 EOL~~ → **hecho** (Dockerfile en 3.11-slim).
+- **Pendiente:** re-verificar los tests por la vía Docker del enunciado. En la notebook, el `.env` (con `ENCRYPTION_KEY` y `FIREBASE_SERVICE_ACCOUNT_PATH`) **no está en git** → tenerlo local; `pip install -r requirements.txt` si el venv está limpio.
 
 ---
 
