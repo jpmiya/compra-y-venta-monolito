@@ -47,15 +47,18 @@ docker compose stop test-db       # (opcional) apagar al terminar
 > Snapshot de handoff entre agentes: **qué se hizo último** y **qué sigue**. Las **Decisiones vigentes** y la **Deuda técnica** son la referencia estable del diseño.
 
 ### Último que se hizo
-- **Rediseño del diseño** (PLAN + SPECS): 7 correcciones → comunicación sincrónica salvo Delivery, pivote `DebitarSaldo`, log de deliverys, canales de respuesta múltiples, RabbitMQ solo para delivery, todo hexagonal, flechas fuera del diagrama. Gaps de coherencia resueltos.
-- **Etapa 0 (limpieza):** módulo `ordenes` eliminado (código + `main.py` + `alembic/env.py` + TRUNCATE de `conftest.py` + migración reversible `d2e4f6a8b0c1`). Python 3.11 confirmado (Dockerfile ya 3.11). `docker-compose.yml`: nuevo servicio `test-db` (5433, matchea el default de `conftest.py`).
-- **Proceso:** agregada la **DoD por etapa** (ver "Metodología").
-- **Verificación:** **63/63 verde** (corridos con el fallback nativo — en la máquina de escritorio no hay Docker). Commit `36ebc03` pusheado a `main`.
+- **Etapa 0 completa + Servicio 1 (Identidad) + Servicio 2 (Billetera):**
+  - Docker verificado: **63/63 verde** vía `docker compose up -d test-db && pytest tests/ -v`. Permisos de Docker fijados (grupo `docker`, socket actualizado).
+  - `docker-compose.yml`: RabbitMQ 3.13-management (`:5672`/`:15672`) + `identidad-db` (`:5434`), `identidad-test-db` (`:5435`), `billetera-db` (`:5436`), `billetera-test-db` (`:5437`). Containers de servicio con `profiles: ["microservices"]`.
+  - `services/shared/contracts/`: contratos Pydantic inter-servicio (`identidad.py`, `billetera.py`, `catalogo.py`, `delivery.py`).
+  - **Servicio Identidad** (`services/identidad/`): estructura hexagonal completa (domain, adapters/rest, adapters/persistence, core). Endpoints públicos `/personas`, `/usuarios`, `/direcciones` + endpoints internos `/interno/usuarios/{id}`, `/interno/usuarios/by-firebase/{uid}`, `/interno/direcciones/{id}`. **12/12 tests verde** (7 admin + 5 interno).
+  - **Servicio Billetera** (`services/billetera/`): estructura hexagonal. `MensajeProcesado` (idempotencia). `BilleteraVirtual.usuario_id` sin FK física (referencia cross-service). Endpoint público `/billetera` (get/cargar/historial) resuelve `usuario_id` llamando a Identidad. Endpoint interno `/interno/debitar` implementa `DebitarSaldo` idempotente por `message_id` — es el **pivote** de la saga. **10/10 tests verde** (6 billetera + 4 debitar/idempotencia).
+  - Monolito intacto: **63/63 verde**.
 
 ### Qué sigue
-1. **Re-verificar los tests por la vía Docker del enunciado:** `docker compose up -d test-db && pytest tests/ -v`.
-2. Completar el resto de la **Etapa 0**: RabbitMQ en `docker-compose` + esqueleto hexagonal reutilizable + base de log de deliverys/idempotencia.
-3. **Servicio 1: Identidad.**
+1. **Servicio 3: Catálogo** (`productos` + `busqueda`): resolver `validar_direccion_vendedor` (call a Identidad) + selectinload de dirección + stock reservado vs. disponible + `ReservarStock`/`DescontarStock`/`LiberarStock` idempotentes.
+2. **Servicio 4: Delivery** (async post-pivote): exponer `CrearDeliveries` idempotente consumiendo de RabbitMQ.
+3. **Servicio 5: Carrito & Checkout** (orquestador): `CheckoutSaga` + log de deliverys + compensación.
 
 ### Decisiones técnicas vigentes
 - **Todo hexagonal (ports & adapters).** Cada servicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.
@@ -74,7 +77,13 @@ docker compose stop test-db       # (opcional) apagar al terminar
 ### Deuda técnica / problemas conocidos
 - ~~Módulo `ordenes` a eliminar~~ → **hecho**.
 - ~~Python 3.9 EOL~~ → **hecho** (Dockerfile en 3.11-slim).
-- **Pendiente:** re-verificar los tests por la vía Docker del enunciado. En la notebook, el `.env` (con `ENCRYPTION_KEY` y `FIREBASE_SERVICE_ACCOUNT_PATH`) **no está en git** → tenerlo local; `pip install -r requirements.txt` si el venv está limpio.
+- ~~Re-verificar tests vía Docker~~ → **hecho** (63/63 verde).
+- ~~RabbitMQ en docker-compose~~ → **hecho**.
+- ~~Esqueleto hexagonal + contratos~~ → **hecho** (`services/shared/contracts/`, estructura identidad/billetera).
+- ~~Idempotencia base~~ → **hecho** (`MensajeProcesado` en Billetera).
+- ~~Servicio 1: Identidad~~ → **hecho** (12/12 tests).
+- ~~Servicio 2: Billetera~~ → **hecho** (10/10 tests, DebitarSaldo idempotente).
+- En la notebook, el `.env` **no está en git** → tenerlo local con `ENCRYPTION_KEY` y `FIREBASE_SERVICE_ACCOUNT_PATH`.
 
 ---
 
@@ -139,25 +148,26 @@ Detalle completo en `PLAN_MIGRACION_MICROSERVICIOS.md`. Resumen:
 ### Etapa 0 — Preparación e infra base
 - [x] Eliminar módulo `ordenes` (código + router en `main.py` + import en `alembic/env.py` + TRUNCATE de `conftest.py` + migración `d2e4f6a8b0c1` que dropea `orden_items`/`ordenes`)
 - [x] Subir a Python 3.11 (Dockerfile ya en `python:3.11-slim`; venv y CI corren 3.11.6)
-- [ ] `docker-compose` con RabbitMQ levantado (solo para el delivery async)
-- [ ] Definir esqueleto hexagonal reutilizable (puertos + adaptadores REST/persistencia)
-- [ ] Definir contratos: llamadas sincrónicas (REST) de los pasos de la saga + mensajes async de delivery con **canales de respuesta múltiples**
-- [ ] Base reutilizable de **log de deliverys** (retry) + tabla de idempotencia (mensajes procesados)
+- [x] `docker-compose` con RabbitMQ levantado (solo para el delivery async)
+- [x] Definir esqueleto hexagonal reutilizable (puertos + adaptadores REST/persistencia) — ver `services/identidad/` y `services/billetera/` como referencia
+- [x] Definir contratos: llamadas sincrónicas (REST) de los pasos de la saga + mensajes async de delivery con **canales de respuesta múltiples** — ver `services/shared/contracts/`
+- [x] Base reutilizable de **log de deliverys** (retry) + tabla de idempotencia (`MensajeProcesado` en `services/billetera/app/adapters/persistence/models.py`)
 
 ### Servicio 1 — Identidad y Acceso (`admin`)
-- [ ] Extraer a servicio hexagonal con BD propia (personas, usuarios, roles, usuario_roles, direcciones)
-- [ ] REST API: ABM + registro/auto-registro
-- [ ] Firebase Auth adapter (`verify_id_token`)
-- [ ] Endpoint de consulta de usuario/dirección por ID (para los demás servicios, síncrono REST)
-- [ ] Tests: dominio `admin` + mock de Firebase en el guard
+- [x] Extraer a servicio hexagonal con BD propia (personas, usuarios, roles, usuario_roles, direcciones)
+- [x] REST API: ABM personas/usuarios/direcciones
+- [x] Firebase Auth adapter (`verify_id_token`)
+- [x] Endpoint de consulta de usuario/dirección por ID (para los demás servicios, síncrono REST) — `/interno/usuarios/{id}`, `/interno/usuarios/by-firebase/{uid}`, `/interno/direcciones/{id}`
+- [x] Tests: 7 admin + 5 interno = **12/12 verde**
 
 ### Servicio 2 — Billetera (`billetera`) — **pivote de la saga**
-- [ ] Extraer a servicio hexagonal con BD propia (billeteras, transacciones_billetera)
-- [ ] REST API: cargar / consultar saldo e historial
-- [ ] `DebitarSaldo` como endpoint **sincrónico** e idempotente (por `message_id`), con commit propio (hoy `descontar_saldo` no commitea) — es el **pivote** (go/no-go)
-- [ ] Respuesta sincrónica: saldo debitado OK / saldo insuficiente (dispara `LiberarStock` en el orquestador)
-- [ ] `ReintegrarSaldo`: **fuera de la saga** (queda muerto con el pivote actual) — eliminar o dejar como operación administrativa
-- [ ] Tests: dominio + handler `DebitarSaldo` (idempotencia)
+- [x] Extraer a servicio hexagonal con BD propia (billeteras, transacciones_billetera, mensajes_procesados)
+- [x] REST API: cargar / consultar saldo e historial
+- [x] `DebitarSaldo` como endpoint **sincrónico** e idempotente (por `message_id`), con commit propio — es el **pivote** (go/no-go). Devuelve `SaldoRespuesta(ok, saldo_resultante, error)`.
+- [x] Auth pública: verifica Firebase → llama a Identidad `/interno/usuarios/by-firebase/{uid}` para resolver `usuario_id`
+- [x] `usuario_id` en `billeteras` sin FK física (referencia cross-service por ID)
+- [x] `ReintegrarSaldo`: excluido (queda muerto con el pivote en Billetera)
+- [x] Tests: 6 billetera + 4 debitar (idempotencia, saldo insuf., transacción) = **10/10 verde**
 
 ### Servicio 3 — Catálogo (`productos` + `busqueda`)
 - [ ] Extraer a servicio hexagonal con BD propia (productos, categorias, resenas)
