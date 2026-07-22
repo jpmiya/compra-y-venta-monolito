@@ -47,6 +47,13 @@ docker compose stop test-db       # (opcional) apagar al terminar
 > Snapshot de handoff entre agentes: **qué se hizo último** y **qué sigue**. Las **Decisiones vigentes** y la **Deuda técnica** son la referencia estable del diseño.
 
 ### Último que se hizo — Sesión 2026-07-22 (Nicolas)
+- **Servicio 4 (Delivery) completo** (`services/delivery/`, puerto `8004`, DBs `delivery-db` `:5440` / `delivery-test-db` `:5441`):
+  - Estructura hexagonal con un adaptador de entrada nuevo: **consumer RabbitMQ** (`adapters/broker/consumer.py`, aio-pika 9.4.3) además del REST público (`/deliveries` portado del monolito: pendientes, mis-asignados, detalle, tomar, entregar).
+  - **`CrearDeliveries` asincrónico post-pivote**: el orquestador publica `CrearDeliveriesCmd` en la cola `delivery.crear_deliveries` con un **`reply_queue` propio por saga** (canales de respuesta múltiples, plan §9); Delivery crea un `DeliveryOrder` por ítem y publica `DeliveriesCreado` en ese canal.
+  - **Idempotencia con memoria de resultado**: `MensajeProcesado.delivery_ids` guarda los IDs creados — una reentrega del mismo `message_id` (retry del log del orquestador) devuelve los MISMOS ids sin duplicar, y re-publica la respuesta (por si el orquestador no la recibió).
+  - Diseño testeable sin broker: `procesar_crear_deliveries(payload, session_factory, publicar_respuesta)` es transporte-agnóstico (el publicador es un puerto); el consumer real lo envuelve. Consumer con `connect_robust` + reconexión, arrancado en el lifespan como task (`BROKER_ENABLED=false` lo apaga en tests).
+  - **Smoke test end-to-end contra RabbitMQ real verificado**: comando publicado → consumer consume → `DeliveriesCreado` recibido en el reply_queue de la saga. (Script efímero, no quedó en el repo; el e2e formal de retry viene con la etapa Carrito, plan §10.)
+  - `docker-compose`: servicio `delivery` (8004) depende de `delivery-db` + `rabbitmq` healthy.
 - **Servicio 3 (Catálogo) completo** (`services/catalogo/`, puerto `8003`, DBs `catalogo-db` `:5438` / `catalogo-test-db` `:5439`):
   - Estructura hexagonal idéntica a Billetera (adapters/rest, adapters/persistence, core, service). Se llevó `productos` + `busqueda` del monolito (búsqueda sigue siendo capacidad de consulta, no servicio aparte: mismo router).
   - **Stock reservado vs. disponible**: columna nueva `Producto.stock_reservado`; `stock_disponible = stock - stock_reservado` (property). Búsqueda y listados filtran por **disponible** > 0 (un producto con todo su stock reservado por sagas en curso desaparece del catálogo).
@@ -56,13 +63,13 @@ docker compose stop test-db       # (opcional) apagar al terminar
   - Endpoint interno extra `GET /interno/productos/{id}` (lo van a consumir Carrito y Delivery en las etapas 4-5).
   - FKs cross-service (`vendedor_id`, `direccion_punto_venta_id`, `Resena.usuario_id`) sin constraint físico, como en Billetera.
 - **Identidad**: se agregó `GET /interno/direcciones?ids=` (batch) + 2 tests. Cuidado con el orden de rutas: va declarado antes de `/interno/direcciones/{id}`.
-- **Tests: todo verde** — Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (112 total), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db`.
+- **Tests: todo verde** — Delivery **12/12** (8 ciclo de vida + 4 CrearDeliveries/idempotencia), Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (**124 total**), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db`.
 - Entorno local de esta máquina: venv con **Python 3.12** (el 3.9 del sistema no compila `cryptography`); `.env` creado desde `.env.example` apuntando a `localhost:5433` (no se commitea). Ojo: el container `pagina-perfumes-no-back-db-1` (otro proyecto) se auto-levanta con Docker y pisa el puerto 5433 — frenarlo antes de correr tests (`docker stop pagina-perfumes-no-back-db-1`).
 
 ### Qué sigue
-1. **Servicio 4: Delivery** (async post-pivote): exponer `CrearDeliveries` idempotente consumiendo de RabbitMQ, con canales de respuesta múltiples.
-2. **Servicio 5: Carrito & Checkout** (orquestador): `CheckoutSaga` (ReservarStock → DebitarSaldo (pivote) → DescontarStock → vaciar carrito → CrearDeliveries async) + log de deliverys + compensación (`LiberarStock`).
-3. Al extraer Carrito: probar end-to-end un camino de fallo con compensación real (saldo insuficiente → LiberarStock → 402) y un retry de delivery desde el log (plan §10).
+1. **Servicio 5: Carrito & Checkout** (orquestador, última etapa): `CheckoutSaga` (ReservarStock → DebitarSaldo (pivote) → DescontarStock → vaciar carrito → CrearDeliveries async vía RabbitMQ) + estado de saga persistido + **log de deliverys** (outbox con retry) + compensación (`LiberarStock`).
+2. Al extraer Carrito: probar end-to-end un camino de fallo con compensación real (saldo insuficiente → LiberarStock → 402) y un retry de delivery desde el log (plan §10).
+3. Cierre: monolito-fachada / API Gateway y decidir qué queda del monolito (web UI, notificaciones).
 
 ### Decisiones técnicas vigentes
 - **Todo hexagonal (ports & adapters).** Cada servicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.

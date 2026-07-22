@@ -186,6 +186,55 @@ services:
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     profiles: ["microservices"]
 
+  # --- Servicio 4: Delivery ---
+  delivery-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass123
+      POSTGRES_DB: delivery_db
+    ports:
+      - "5440:5432"
+    volumes:
+      - delivery_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  delivery-test-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass123
+      POSTGRES_DB: delivery_test
+    ports:
+      - "5441:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  delivery:
+    build: ./services/delivery
+    ports:
+      - "8004:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:pass123@delivery-db:5432/delivery_db
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/firebase-service-account.json
+      IDENTIDAD_SERVICE_URL: http://identidad:8000
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      delivery-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    profiles: ["microservices"]
+
   app:
     build: .
     ports:
@@ -214,3 +263,4 @@ volumes:
   identidad_data:
   billetera_data:
   catalogo_data:
+  delivery_data:
