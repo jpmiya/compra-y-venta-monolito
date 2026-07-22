@@ -47,6 +47,15 @@ docker compose stop test-db       # (opcional) apagar al terminar
 > Snapshot de handoff entre agentes: **qué se hizo último** y **qué sigue**. Las **Decisiones vigentes** y la **Deuda técnica** son la referencia estable del diseño.
 
 ### Último que se hizo — Sesión 2026-07-22 (Nicolas)
+- **Servicio 5 (Carrito & Checkout) completo — LA MIGRACIÓN DE LOS 5 SERVICIOS ESTÁ TERMINADA ✅** (`services/carrito/`, puerto `8005`, DBs `carrito-db` `:5442` / `carrito-test-db` `:5443`):
+  - **`CheckoutSaga`** ([saga.py](services/carrito/app/saga.py)): reemplaza el checkout ACID del monolito. Pasos: ReservarStock (sync, compensable) → **DebitarSaldo (pivote)** → DescontarStock (sync, confirma) → transacción local (vaciar carrito + escribir `DeliveryLog`) → CrearDeliveries (async vía RabbitMQ).
+  - **Estado de saga persistido** (`sagas_checkout`): iniciada → stock_reservado → debitada → stock_descontado → completada; ramas `fallida` (reserva rechazada, HTTP 409) y `compensada` (pivote falló → `LiberarStock` → HTTP 402). Consultable en `GET /carrito/checkout/{saga_id}`.
+  - **Log de deliverys (outbox, plan §5.3/§9)**: `delivery_log` se escribe en la MISMA transacción que vacía el carrito, ANTES de publicar. Estados pendiente_envio → enviado → confirmado (cuando llega `DeliveriesCreado` por el canal propio de la saga). Worker de retry en el lifespan re-publica lo no confirmado — seguro porque Delivery es idempotente.
+  - **message_id determinísticos**: `uuid5(saga_id, paso)` — un reintento del orquestador reusa el mismo id y ningún participante duplica.
+  - **El checkout responde sin esperar al delivery**: si el broker está caído, el log queda en pendiente_envio y el retry lo levanta (el checkout NO falla). CheckoutResponse ya no trae `delivery_orders` (son async): trae `saga_id`, total, saldo restante.
+  - Carrito CRUD portado del monolito; el producto se valida contra Catálogo (`GET /interno/productos/{id}`) usando `stock_disponible` (el chequeo definitivo es ReservarStock).
+  - **Tests 20/20**: carrito (10) + saga (10): camino feliz, descuento, carrito vacío, stock insuficiente (409, sin compensación, carrito intacto), **saldo insuficiente → LiberarStock → 402 (compensación real, plan §10)**, publicación/outbox, **retry desde el log con broker caído y mismo message_id (plan §10)**, confirmación, message_ids determinísticos, consulta de saga.
+  - **Smoke E2E del tramo async con RabbitMQ real**: publisher real de Carrito → cola `delivery.crear_deliveries` → consumer real de Delivery → `DeliveriesCreado` recibido en `carrito.respuesta.<saga_id>` ✅.
 - **Servicio 4 (Delivery) completo** (`services/delivery/`, puerto `8004`, DBs `delivery-db` `:5440` / `delivery-test-db` `:5441`):
   - Estructura hexagonal con un adaptador de entrada nuevo: **consumer RabbitMQ** (`adapters/broker/consumer.py`, aio-pika 9.4.3) además del REST público (`/deliveries` portado del monolito: pendientes, mis-asignados, detalle, tomar, entregar).
   - **`CrearDeliveries` asincrónico post-pivote**: el orquestador publica `CrearDeliveriesCmd` en la cola `delivery.crear_deliveries` con un **`reply_queue` propio por saga** (canales de respuesta múltiples, plan §9); Delivery crea un `DeliveryOrder` por ítem y publica `DeliveriesCreado` en ese canal.
@@ -63,13 +72,14 @@ docker compose stop test-db       # (opcional) apagar al terminar
   - Endpoint interno extra `GET /interno/productos/{id}` (lo van a consumir Carrito y Delivery en las etapas 4-5).
   - FKs cross-service (`vendedor_id`, `direccion_punto_venta_id`, `Resena.usuario_id`) sin constraint físico, como en Billetera.
 - **Identidad**: se agregó `GET /interno/direcciones?ids=` (batch) + 2 tests. Cuidado con el orden de rutas: va declarado antes de `/interno/direcciones/{id}`.
-- **Tests: todo verde** — Delivery **12/12** (8 ciclo de vida + 4 CrearDeliveries/idempotencia), Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (**124 total**), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db`.
+- **Tests: todo verde** — Carrito **20/20**, Delivery **12/12** (8 ciclo de vida + 4 CrearDeliveries/idempotencia), Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (**144 total**), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db carrito-test-db`.
 - Entorno local de esta máquina: venv con **Python 3.12** (el 3.9 del sistema no compila `cryptography`); `.env` creado desde `.env.example` apuntando a `localhost:5433` (no se commitea). Ojo: el container `pagina-perfumes-no-back-db-1` (otro proyecto) se auto-levanta con Docker y pisa el puerto 5433 — frenarlo antes de correr tests (`docker stop pagina-perfumes-no-back-db-1`).
 
-### Qué sigue
-1. **Servicio 5: Carrito & Checkout** (orquestador, última etapa): `CheckoutSaga` (ReservarStock → DebitarSaldo (pivote) → DescontarStock → vaciar carrito → CrearDeliveries async vía RabbitMQ) + estado de saga persistido + **log de deliverys** (outbox con retry) + compensación (`LiberarStock`).
-2. Al extraer Carrito: probar end-to-end un camino de fallo con compensación real (saldo insuficiente → LiberarStock → 402) y un retry de delivery desde el log (plan §10).
-3. Cierre: monolito-fachada / API Gateway y decidir qué queda del monolito (web UI, notificaciones).
+### Qué sigue (cierre — los 5 servicios ya están extraídos)
+1. **API Gateway / monolito-fachada**: decidir la cara al cliente (el mapa de contexto del TP pide gateway). Hoy cada servicio expone su puerto (8001-8005); el monolito sigue corriendo entero como estaba (63/63) pero nada lo enruta a los servicios.
+2. **Decidir qué queda del monolito**: web UI (Jinja2) y `notificaciones` no se migraron (fuera de alcance según plan §2). Opciones: apuntar la UI al gateway, o dejar el monolito como está para la comparación monolito-vs-microservicios del TP.
+3. **Levantar todo junto y probar la saga completa por HTTP real**: `docker compose --profile microservices up` (identidad+billetera+catalogo+delivery+carrito+rabbitmq) y correr un checkout de punta a punta con token Firebase real.
+4. Extras del enunciado si los pide: colección Postman de los microservicios, diagramas C4 actualizados (contenedores por servicio + broker), CI por servicio.
 
 ### Decisiones técnicas vigentes
 - **Todo hexagonal (ports & adapters).** Cada servicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.

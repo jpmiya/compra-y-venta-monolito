@@ -224,14 +224,14 @@ Además, transversal: **log de deliverys** en Carrito (outbox aplicado a deliver
 
 ## 10. Checklist de ejecución
 
-- [ ] Eliminar módulo `ordenes` y sus tablas; subir a Python 3.11.
-- [ ] Levantar broker (RabbitMQ, §9) en `docker-compose` — solo para el delivery async, con canales de respuesta múltiples.
-- [ ] Extraer **Identidad** con BD propia; monolito consume por HTTP síncrono.
-- [ ] Extraer **Billetera**; convertir `descontar_saldo` en `DebitarSaldo` (**pivote**) con commit propio e idempotencia.
-- [ ] Extraer **Catálogo**; resolver `validar_direccion_vendedor` (§3) y el `selectinload` de dirección (§4); separar stock **reservado** vs **disponible** (`ReservarStock`/`DescontarStock`/`LiberarStock`).
-- [ ] Extraer **Delivery**; exponer `CrearDeliveries` asincrónico e idempotente.
-- [ ] Implementar **`CheckoutSaga`** en Carrito: estado persistido + llamadas sincrónicas a Catálogo/Billetera + **log de deliverys** (retry) + idempotencia + compensación (`LiberarStock`).
-- [ ] Probar end-to-end **un camino de fallo** con compensación real (saldo insuficiente → `LiberarStock` → `402`) y **un retry de delivery** desde el log.
+- [x] Eliminar módulo `ordenes` y sus tablas; subir a Python 3.11.
+- [x] Levantar broker (RabbitMQ, §9) en `docker-compose` — solo para el delivery async, con canales de respuesta múltiples.
+- [x] Extraer **Identidad** con BD propia; monolito consume por HTTP síncrono.
+- [x] Extraer **Billetera**; convertir `descontar_saldo` en `DebitarSaldo` (**pivote**) con commit propio e idempotencia.
+- [x] Extraer **Catálogo**; resolver `validar_direccion_vendedor` (§3) y el `selectinload` de dirección (§4); separar stock **reservado** vs **disponible** (`ReservarStock`/`DescontarStock`/`LiberarStock`).
+- [x] Extraer **Delivery**; exponer `CrearDeliveries` asincrónico e idempotente.
+- [x] Implementar **`CheckoutSaga`** en Carrito: estado persistido + llamadas sincrónicas a Catálogo/Billetera + **log de deliverys** (retry) + idempotencia + compensación (`LiberarStock`).
+- [x] Probar end-to-end **un camino de fallo** con compensación real (saldo insuficiente → `LiberarStock` → `402`) y **un retry de delivery** desde el log. *(Tests de la saga en `services/carrito`; el tramo broker validado con smoke real Carrito→RabbitMQ→Delivery→respuesta.)*
 
 ---
 
