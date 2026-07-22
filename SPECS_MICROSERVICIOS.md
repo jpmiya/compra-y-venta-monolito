@@ -46,19 +46,23 @@ docker compose stop test-db       # (opcional) apagar al terminar
 
 > Snapshot de handoff entre agentes: **qué se hizo último** y **qué sigue**. Las **Decisiones vigentes** y la **Deuda técnica** son la referencia estable del diseño.
 
-### Último que se hizo
-- **Etapa 0 completa + Servicio 1 (Identidad) + Servicio 2 (Billetera):**
-  - Docker verificado: **63/63 verde** vía `docker compose up -d test-db && pytest tests/ -v`. Permisos de Docker fijados (grupo `docker`, socket actualizado).
-  - `docker-compose.yml`: RabbitMQ 3.13-management (`:5672`/`:15672`) + `identidad-db` (`:5434`), `identidad-test-db` (`:5435`), `billetera-db` (`:5436`), `billetera-test-db` (`:5437`). Containers de servicio con `profiles: ["microservices"]`.
-  - `services/shared/contracts/`: contratos Pydantic inter-servicio (`identidad.py`, `billetera.py`, `catalogo.py`, `delivery.py`).
-  - **Servicio Identidad** (`services/identidad/`): estructura hexagonal completa (domain, adapters/rest, adapters/persistence, core). Endpoints públicos `/personas`, `/usuarios`, `/direcciones` + endpoints internos `/interno/usuarios/{id}`, `/interno/usuarios/by-firebase/{uid}`, `/interno/direcciones/{id}`. **12/12 tests verde** (7 admin + 5 interno).
-  - **Servicio Billetera** (`services/billetera/`): estructura hexagonal. `MensajeProcesado` (idempotencia). `BilleteraVirtual.usuario_id` sin FK física (referencia cross-service). Endpoint público `/billetera` (get/cargar/historial) resuelve `usuario_id` llamando a Identidad. Endpoint interno `/interno/debitar` implementa `DebitarSaldo` idempotente por `message_id` — es el **pivote** de la saga. **10/10 tests verde** (6 billetera + 4 debitar/idempotencia).
-  - Monolito intacto: **63/63 verde**.
+### Último que se hizo — Sesión 2026-07-22 (Nicolas)
+- **Servicio 3 (Catálogo) completo** (`services/catalogo/`, puerto `8003`, DBs `catalogo-db` `:5438` / `catalogo-test-db` `:5439`):
+  - Estructura hexagonal idéntica a Billetera (adapters/rest, adapters/persistence, core, service). Se llevó `productos` + `busqueda` del monolito (búsqueda sigue siendo capacidad de consulta, no servicio aparte: mismo router).
+  - **Stock reservado vs. disponible**: columna nueva `Producto.stock_reservado`; `stock_disponible = stock - stock_reservado` (property). Búsqueda y listados filtran por **disponible** > 0 (un producto con todo su stock reservado por sagas en curso desaparece del catálogo).
+  - **Handlers de saga** en `/interno/stock/`: `reservar` (todo-o-nada, compensable), `descontar` (confirma tras el pivote: baja físico + libera reserva), `liberar` (compensación, tolerante a productos inexistentes). Idempotentes por `message_id` vía `MensajeProcesado`; igual que Billetera, solo se registra el message_id cuando el comando **mutó** estado (un rechazo sin efectos se reevalúa al reintentar).
+  - **`validar_direccion_vendedor` resuelto con llamada síncrona a Identidad** (`GET /interno/direcciones/{id}`): valida activa + pertenencia (`persona_id` del vendedor). El guard de auth (`get_current_usuario`) devuelve el usuario completo de Identidad porque Catálogo necesita `persona_id`.
+  - **Dirección de punto de venta: composición síncrona en lectura** (decisión de Nicolas entre snapshot desnormalizado / composición / réplica por eventos): Catálogo guarda solo `direccion_punto_venta_id` (sin FK) y al servir listados resuelve las direcciones en **una llamada batch** al endpoint nuevo de Identidad `GET /interno/direcciones?ids=...`. Si Identidad no responde, degrada con `direccion_punto_venta: null` en vez de romper la búsqueda.
+  - Endpoint interno extra `GET /interno/productos/{id}` (lo van a consumir Carrito y Delivery en las etapas 4-5).
+  - FKs cross-service (`vendedor_id`, `direccion_punto_venta_id`, `Resena.usuario_id`) sin constraint físico, como en Billetera.
+- **Identidad**: se agregó `GET /interno/direcciones?ids=` (batch) + 2 tests. Cuidado con el orden de rutas: va declarado antes de `/interno/direcciones/{id}`.
+- **Tests: todo verde** — Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (112 total), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db`.
+- Entorno local de esta máquina: venv con **Python 3.12** (el 3.9 del sistema no compila `cryptography`); `.env` creado desde `.env.example` apuntando a `localhost:5433` (no se commitea). Ojo: el container `pagina-perfumes-no-back-db-1` (otro proyecto) se auto-levanta con Docker y pisa el puerto 5433 — frenarlo antes de correr tests (`docker stop pagina-perfumes-no-back-db-1`).
 
 ### Qué sigue
-1. **Servicio 3: Catálogo** (`productos` + `busqueda`): resolver `validar_direccion_vendedor` (call a Identidad) + selectinload de dirección + stock reservado vs. disponible + `ReservarStock`/`DescontarStock`/`LiberarStock` idempotentes.
-2. **Servicio 4: Delivery** (async post-pivote): exponer `CrearDeliveries` idempotente consumiendo de RabbitMQ.
-3. **Servicio 5: Carrito & Checkout** (orquestador): `CheckoutSaga` + log de deliverys + compensación.
+1. **Servicio 4: Delivery** (async post-pivote): exponer `CrearDeliveries` idempotente consumiendo de RabbitMQ, con canales de respuesta múltiples.
+2. **Servicio 5: Carrito & Checkout** (orquestador): `CheckoutSaga` (ReservarStock → DebitarSaldo (pivote) → DescontarStock → vaciar carrito → CrearDeliveries async) + log de deliverys + compensación (`LiberarStock`).
+3. Al extraer Carrito: probar end-to-end un camino de fallo con compensación real (saldo insuficiente → LiberarStock → 402) y un retry de delivery desde el log (plan §10).
 
 ### Decisiones técnicas vigentes
 - **Todo hexagonal (ports & adapters).** Cada servicio expone su dominio detrás de puertos, con adaptadores REST / persistencia / Firebase / saga.
@@ -77,6 +81,8 @@ docker compose stop test-db       # (opcional) apagar al terminar
 ### Deuda técnica / problemas conocidos
 - ~~Módulo `ordenes` a eliminar~~ → **hecho**.
 - ~~Python 3.9 EOL~~ → **hecho** (Dockerfile en 3.11-slim).
+- `reservar_stock` no toma lock de fila (`SELECT ... FOR UPDATE`): dos sagas concurrentes sobre el mismo producto podrían sobre-reservar. Mismo comportamiento que tenía el checkout del monolito; agregar `with_for_update()` si se quiere cerrar la ventana.
+- La composición síncrona de direcciones acopla la lectura del catálogo a Identidad en runtime (degrada a `direccion: null` si no responde). Si molesta en la demo, el fallback es levantar ambos servicios juntos (`--profile microservices`).
 - ~~Re-verificar tests vía Docker~~ → **hecho** (63/63 verde).
 - ~~RabbitMQ en docker-compose~~ → **hecho**.
 - ~~Esqueleto hexagonal + contratos~~ → **hecho** (`services/shared/contracts/`, estructura identidad/billetera).

@@ -1,7 +1,7 @@
 """Endpoints internos — solo accesibles desde la red interna de microservicios (sin auth pública)."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
@@ -31,6 +31,15 @@ async def get_usuario_by_firebase(
     if not usuario:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
     return usuario
+
+
+@router.get("/direcciones", response_model=list[DireccionResponse])
+async def get_direcciones_batch(
+    ids: list[uuid.UUID] = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Resolución batch de direcciones (composición síncrona desde Catálogo)."""
+    return await service.get_direcciones_by_ids(db, ids)
 
 
 @router.get("/direcciones/{direccion_id}", response_model=DireccionResponse)

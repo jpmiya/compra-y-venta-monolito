@@ -60,3 +60,45 @@ async def test_get_direccion(
 async def test_get_firebase_uid_inexistente(internal_client: AsyncClient):
     response = await internal_client.get("/interno/usuarios/by-firebase/uid-que-no-existe")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_direcciones_batch(
+    internal_client: AsyncClient, db: AsyncSession, usuario_test: Usuario
+):
+    """Resolución batch de direcciones (composición síncrona desde Catálogo)."""
+    d1 = Direccion(
+        persona_id=usuario_test.persona_id,
+        calle="Av. Santa Fe", numero="1000",
+        ciudad="Buenos Aires", provincia="CABA", activa=True,
+    )
+    d2 = Direccion(
+        persona_id=usuario_test.persona_id,
+        calle="Av. Cabildo", numero="2000",
+        ciudad="Buenos Aires", provincia="CABA", activa=True,
+    )
+    db.add_all([d1, d2])
+    await db.commit()
+    await db.refresh(d1)
+    await db.refresh(d2)
+
+    response = await internal_client.get(
+        "/interno/direcciones",
+        params=[("ids", str(d1.id)), ("ids", str(d2.id))],
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    calles = {d["calle"] for d in data}
+    assert calles == {"Av. Santa Fe", "Av. Cabildo"}
+
+
+@pytest.mark.asyncio
+async def test_get_direcciones_batch_ignora_inexistentes(internal_client: AsyncClient):
+    """IDs que no existen simplemente no vienen en la respuesta (no rompe el listado)."""
+    response = await internal_client.get(
+        "/interno/direcciones",
+        params=[("ids", "00000000-0000-0000-0000-000000000000")],
+    )
+    assert response.status_code == 200
+    assert response.json() == []

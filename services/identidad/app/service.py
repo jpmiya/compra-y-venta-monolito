@@ -127,6 +127,16 @@ async def get_direccion_by_id(db: AsyncSession, direccion_id: uuid.UUID) -> Opti
     return result.scalar_one_or_none()
 
 
+async def get_direcciones_by_ids(
+    db: AsyncSession, direccion_ids: List[uuid.UUID]
+) -> List[Direccion]:
+    """Resolución batch para composición cross-servicio (p.ej. Catálogo en listados)."""
+    if not direccion_ids:
+        return []
+    result = await db.execute(select(Direccion).where(Direccion.id.in_(direccion_ids)))
+    return result.scalars().all()
+
+
 async def crear_direccion(
     db: AsyncSession, persona_id: uuid.UUID, data: DireccionCreate
 ) -> Direccion:
