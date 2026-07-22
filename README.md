@@ -52,6 +52,27 @@ cd services/<servicio> && pytest tests/ -v     # o correr los 6 (monolito inclui
 
 CI: `.github/workflows/ci.yml` corre el monolito + los 5 servicios (matrix) en cada push.
 
+### ⚠️ Pendiente — requiere intervención humana
+
+Todo lo automatizable está hecho y verificado (144 tests en verde, stack completo levantado, gateway, cadena async con RabbitMQ real). Lo único que falta necesita **credenciales reales de Firebase** (no están en el repo, las tiene el equipo):
+
+1. **Configurar credenciales** (una sola vez por máquina):
+   - Copiar `firebase-service-account.json` real en la raíz del repo (Firebase Console → Configuración del proyecto → Cuentas de servicio).
+   - Completar `FIREBASE_WEB_API_KEY` en `.env` (y en la variable `firebase_api_key` de la colección Postman).
+
+2. **Correr el e2e autenticado por el gateway**:
+   ```bash
+   docker compose --profile microservices up -d --build
+   ```
+   Importar [`docs/postman_microservicios.json`](docs/postman_microservicios.json) y ejecutar en orden:
+   `00-Auth` (guarda el token solo) → crear persona/usuario/dirección → crear producto → cargar billetera → agregar al carrito → **checkout** → `GET /carrito/checkout/{saga_id}` hasta ver `"delivery_estado": "confirmado"` → tomar y entregar el delivery.
+
+3. **(Opcional, para la demo)** probar los caminos de fallo en vivo:
+   - **Compensación**: cargar menos saldo que el total y hacer checkout → esperar `402` y verificar que el stock reservado se liberó (`GET /productos/{id}`).
+   - **Retry del outbox**: `docker compose stop rabbitmq` → checkout (responde `201` igual) → `docker compose start rabbitmq` → en ≤30s el worker reenvía y la saga pasa a `confirmado`.
+
+4. **Verificar el primer run de CI** del job `test-services` en GitHub Actions (debería salir verde directo).
+
 ---
 
 # El monolito (TP1)
