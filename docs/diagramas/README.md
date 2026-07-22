@@ -1,6 +1,13 @@
 # Diagramas del Sistema
 
-## Modelo C4
+## Arquitectura de microservicios (migración)
+
+| Diagrama | Descripción |
+|----------|-------------|
+| [Contenedores — Microservicios](c4_contenedores_microservicios.md) | Los 5 servicios hexagonales, gateway nginx, RabbitMQ y database-per-service |
+| [Secuencia: CheckoutSaga](uml_secuencia_checkout_saga.md) | Saga por orquestación: camino feliz, compensación (LiberarStock) y retry desde el log (outbox) |
+
+## Modelo C4 (monolito — TP1)
 
 | Diagrama | Descripción |
 |----------|-------------|

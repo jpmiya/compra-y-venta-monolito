@@ -1,9 +1,60 @@
 # compra-y-venta-monolito
 
-Backend de un sistema de compra y venta con arquitectura monolítica.
+Backend de un sistema de compra y venta con delivery.
 Materia: Patrones de Arquitectura de Software.
 
-**Stack:** Python · FastAPI · PostgreSQL · SQLAlchemy 2.x (async) · Alembic · Firebase Authentication
+**Stack:** Python · FastAPI · PostgreSQL · SQLAlchemy 2.x (async) · Alembic · Firebase Authentication · RabbitMQ · nginx
+
+> El repo contiene **dos arquitecturas del mismo sistema**: el monolito modular del TP1
+> (`app/`) y su **migración completa a 5 microservicios hexagonales** (`services/`),
+> con saga de checkout, database-per-service y API Gateway. El monolito sigue
+> funcionando intacto como base de comparación.
+
+---
+
+## Arquitectura de microservicios
+
+```
+Cliente ──► API Gateway (nginx :8080) ──► servicios (cada uno con su PostgreSQL)
+                 │ bloquea /interno/*
+                 ├─ /personas /usuarios /direcciones → Identidad   :8001
+                 ├─ /billetera                       → Billetera   :8002  ← PIVOTE de la saga
+                 ├─ /productos /busqueda             → Catálogo    :8003
+                 ├─ /deliveries                      → Delivery    :8004  ← async vía RabbitMQ
+                 └─ /carrito /carrito/checkout       → Carrito     :8005  ← ORQUESTADOR
+```
+
+- **Todo hexagonal** (ports & adapters): dominio en `service.py`/`saga.py`, adaptadores REST, de persistencia y de broker.
+- **CheckoutSaga** (en Carrito): `ReservarStock → DebitarSaldo (pivote) → DescontarStock → CrearDeliveries (async)`, con compensación (`LiberarStock`), estado persistido, **log de deliverys (outbox + retry)** y comandos **idempotentes por message_id**.
+- **RabbitMQ solo para el delivery async**, con un canal de respuesta propio por saga (`carrito.respuesta.<saga_id>`).
+
+Detalle completo: [`SPECS_MICROSERVICIOS.md`](SPECS_MICROSERVICIOS.md) · [`PLAN_MIGRACION_MICROSERVICIOS.md`](PLAN_MIGRACION_MICROSERVICIOS.md) · diagramas en [`docs/diagramas/`](docs/diagramas/README.md).
+
+### Levantar los microservicios
+
+```bash
+# Requiere ./firebase-service-account.json (credenciales reales de Firebase)
+docker compose --profile microservices up -d --build
+
+curl localhost:8080/health        # gateway
+curl localhost:8080/productos     # catálogo (público)
+# El resto de los endpoints requieren Authorization: Bearer <firebase_id_token>
+```
+
+Colección Postman de los microservicios: [`docs/postman_microservicios.json`](docs/postman_microservicios.json) (variable `base_url` ya apunta al gateway).
+
+### Tests de los microservicios
+
+```bash
+docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db carrito-test-db
+cd services/<servicio> && pytest tests/ -v     # o correr los 6 (monolito incluido)
+```
+
+CI: `.github/workflows/ci.yml` corre el monolito + los 5 servicios (matrix) en cada push.
+
+---
+
+# El monolito (TP1)
 
 ---
 
