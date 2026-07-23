@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
 from app.core.dependencies import get_db, get_current_usuario_id
 from app.core.http_client import (
     CatalogoClient,
@@ -15,7 +14,7 @@ from app.core.http_client import (
     get_catalogo_client,
     get_billetera_client,
 )
-from app.adapters.broker.publisher import get_publicador, reply_queue_de
+from app.adapters.broker.publisher import get_publicador
 from app.adapters.persistence.models import DeliveryLog
 from app import service, saga as saga_module
 from app.saga import (
@@ -121,14 +120,6 @@ async def remover_descuento(
     return service.calcular_totales(carrito)
 
 
-async def _confirmar_en_background(saga_id: uuid.UUID, publicador) -> None:
-    """Escucha DeliveriesCreado en el canal de la saga y marca el log confirmado."""
-    respuesta = await publicador.esperar_confirmacion(reply_queue_de(saga_id))
-    if respuesta and respuesta.get("ok"):
-        async with AsyncSessionLocal() as db:
-            await saga_module.confirmar_delivery(db, saga_id)
-
-
 @router.post("/checkout", response_model=CheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
     data: CheckoutRequest,
@@ -158,7 +149,7 @@ async def checkout(
     if settings.BROKER_ENABLED:
         publicador = get_publicador()
         await saga_module.publicar_delivery_pendiente(db, publicador, resultado["saga_id"])
-        asyncio.create_task(_confirmar_en_background(resultado["saga_id"], publicador))
+        asyncio.create_task(saga_module.escuchar_confirmacion(publicador, resultado["saga_id"]))
 
     return resultado
 

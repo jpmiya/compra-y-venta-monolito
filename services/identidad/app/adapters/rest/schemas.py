@@ -110,6 +110,27 @@ class DireccionUpdate(BaseModel):
     activa: Optional[bool] = None
 
 
+class RegistroRequest(BaseModel):
+    """Alta de primer acceso: crea Persona + Usuario a partir de un token de
+    Firebase válido, sin necesitar un usuario local previo."""
+    nombre_completo: str
+    documento_identidad: str
+    telefono: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+
+    @field_validator("nombre_completo", "documento_identidad")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Este campo no puede estar vacío")
+        return v
+
+
+class RegistroResponse(BaseModel):
+    persona: PersonaResponse
+    usuario: UsuarioResponse
+
+
 class DireccionResponse(BaseModel):
     id: uuid.UUID
     persona_id: uuid.UUID

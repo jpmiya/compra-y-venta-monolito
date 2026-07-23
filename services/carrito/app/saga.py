@@ -13,6 +13,7 @@ orquestación con pasos sincrónicos y un tramo asincrónico final:
 Los message_id son determinísticos por (saga, paso): un reintento del
 orquestador reusa el mismo id y los participantes idempotentes no duplican.
 """
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.adapters.persistence.models import SagaCheckout, DeliveryLog
 from app.adapters.broker.publisher import reply_queue_de
 from app.core.http_client import CatalogoClient, BilleteraClient
@@ -29,6 +31,32 @@ from app.service import _cargar_carrito
 from app.adapters.rest.schemas import CrearDeliveriesCmd, DeliveryItemCmd
 
 logger = logging.getLogger(__name__)
+
+# Sagas con un listener de confirmación activo — evita apilar consumers
+# duplicados en el mismo canal de respuesta cuando el worker de retry
+# reintenta antes de que el listener anterior haya vencido su timeout.
+_escuchando_confirmacion: set[uuid.UUID] = set()
+
+
+async def escuchar_confirmacion(publicador, saga_id: uuid.UUID) -> None:
+    """Espera DeliveriesCreado en el canal de la saga y marca el log confirmado.
+
+    Se llama tanto tras el primer intento de publicación (checkout) como tras
+    cada reenvío del worker de retry: republicar sin volver a escuchar deja
+    la respuesta de Delivery varada en la cola sin consumer (bug real
+    detectado en el e2e: el worker reenviaba el comando pero nadie quedaba
+    esperando la confirmación, así que la saga nunca salía de "enviado").
+    """
+    if saga_id in _escuchando_confirmacion:
+        return
+    _escuchando_confirmacion.add(saga_id)
+    try:
+        respuesta = await publicador.esperar_confirmacion(reply_queue_de(saga_id))
+        if respuesta and respuesta.get("ok"):
+            async with AsyncSessionLocal() as db:
+                await confirmar_delivery(db, saga_id)
+    finally:
+        _escuchando_confirmacion.discard(saga_id)
 
 
 class CarritoVacioError(Exception):
@@ -217,6 +245,7 @@ async def reintentar_deliveries_pendientes(db: AsyncSession, publicador) -> int:
             await publicador.publicar(log.payload, reply_queue_de(log.saga_id))
             log.estado = "enviado"
             reenviados += 1
+            asyncio.create_task(escuchar_confirmacion(publicador, log.saga_id))
         except Exception:
             logger.exception("Retry de saga %s falló; se reintenta en el próximo ciclo", log.saga_id)
         log.intentos += 1

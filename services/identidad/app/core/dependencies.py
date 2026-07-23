@@ -54,3 +54,23 @@ async def get_current_active_user(current_user=Depends(get_current_user)):
             detail="Usuario inactivo",
         )
     return current_user
+
+
+async def get_verified_firebase_payload(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> dict:
+    """Solo valida el token de Firebase — a diferencia de get_current_user, no
+    exige que ya exista un `usuario` local. Es el único punto de entrada sin
+    ese requisito, para poder resolver el huevo-y-la-gallina del primer
+    acceso (token válido pero sin registro local todavía)."""
+    try:
+        payload = verify_firebase_token(credentials.credentials)
+        if not payload.get("uid"):
+            raise ValueError("UID ausente en el token")
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de Firebase inválido o expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return payload

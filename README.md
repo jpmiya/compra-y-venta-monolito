@@ -52,26 +52,21 @@ cd services/<servicio> && pytest tests/ -v     # o correr los 6 (monolito inclui
 
 CI: `.github/workflows/ci.yml` corre el monolito + los 5 servicios (matrix) en cada push.
 
+### ✅ E2E validado (2026-07-23)
+
+Se corrió el flujo completo contra el stack real (`docker compose --profile microservices up -d --build`) con credenciales de Firebase reales, llamando a la API por el gateway. Encontrados y corregidos dos gaps reales que solo aparecían en ejecución:
+
+- **Retry del outbox no confirmaba nunca si el broker caía justo en el checkout.** El worker de retry (`carrito`) reenviaba el comando `CrearDeliveries` pero nunca volvía a escuchar el canal de respuesta de la saga — la confirmación de Delivery quedaba en la cola sin consumidor y la saga se quedaba en `"enviado"` para siempre. Fix: `saga.py::escuchar_confirmacion()` se rearma en cada ciclo de retry (con dedup por `saga_id`).
+- **No existía forma de dar de alta el primer usuario.** El microservicio Identidad exige un `usuario` ya creado para *cualquier* endpoint (incluso para crear una persona), y a diferencia del monolito (que tiene `/web/registro`) no había ningún camino de auto-registro. Se agregó `POST /registro`: toma un token de Firebase válido (sin exigir usuario previo) y crea Persona + Usuario en una transacción, tomando `email`/`uid` del token verificado (no del body).
+
+Camino feliz probado de punta a punta: `POST /registro` → crear dirección → crear producto (valida cross-servicio contra Identidad) → cargar billetera → agregar al carrito → **checkout** → saga `completada` → `delivery_estado: "confirmado"` vía RabbitMQ → tomar → entregar. También se probaron en vivo los dos caminos de falla:
+- **Compensación**: saldo insuficiente → `402` → stock reservado liberado (`LiberarStock`).
+- **Retry del outbox**: `docker compose stop rabbitmq` → checkout (responde `201` igual) → `docker compose start rabbitmq` → confirma en el siguiente ciclo de retry (≤30s).
+
 ### ⚠️ Pendiente — requiere intervención humana
 
-Todo lo automatizable está hecho y verificado (144 tests en verde, stack completo levantado, gateway, cadena async con RabbitMQ real). Lo único que falta necesita **credenciales reales de Firebase** (no están en el repo, las tiene el equipo):
-
-1. **Configurar credenciales** (una sola vez por máquina):
-   - Copiar `firebase-service-account.json` real en la raíz del repo (Firebase Console → Configuración del proyecto → Cuentas de servicio).
-   - Completar `FIREBASE_WEB_API_KEY` en `.env` (y en la variable `firebase_api_key` de la colección Postman).
-
-2. **Correr el e2e autenticado por el gateway**:
-   ```bash
-   docker compose --profile microservices up -d --build
-   ```
-   Importar [`docs/postman_microservicios.json`](docs/postman_microservicios.json) y ejecutar en orden:
-   `00-Auth` (guarda el token solo) → crear persona/usuario/dirección → crear producto → cargar billetera → agregar al carrito → **checkout** → `GET /carrito/checkout/{saga_id}` hasta ver `"delivery_estado": "confirmado"` → tomar y entregar el delivery.
-
-3. **(Opcional, para la demo)** probar los caminos de fallo en vivo:
-   - **Compensación**: cargar menos saldo que el total y hacer checkout → esperar `402` y verificar que el stock reservado se liberó (`GET /productos/{id}`).
-   - **Retry del outbox**: `docker compose stop rabbitmq` → checkout (responde `201` igual) → `docker compose start rabbitmq` → en ≤30s el worker reenvía y la saga pasa a `confirmado`.
-
-4. **Verificar el primer run de CI** del job `test-services` en GitHub Actions (debería salir verde directo).
+1. **Credenciales de Firebase por máquina**: copiar `firebase-service-account.json` real en la raíz del repo y completar `FIREBASE_WEB_API_KEY` en `.env` (y en la variable `firebase_api_key` de la colección Postman) si no están seteadas.
+2. **Verificar el primer run de CI** del job `test-services` en GitHub Actions con los fixes de este commit (debería salir verde).
 
 ---
 

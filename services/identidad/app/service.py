@@ -13,6 +13,7 @@ from app.adapters.rest.schemas import (
     UsuarioUpdate,
     DireccionCreate,
     DireccionUpdate,
+    RegistroRequest,
 )
 
 
@@ -88,6 +89,24 @@ async def crear_usuario(db: AsyncSession, persona_id: uuid.UUID, data: UsuarioCr
     await db.commit()
     await db.refresh(usuario)
     return usuario
+
+
+async def registrar_self(
+    db: AsyncSession, data: RegistroRequest, email: str, firebase_uid: str
+) -> tuple[Persona, Usuario]:
+    """Alta de primer acceso: crea Persona + Usuario en una sola transacción.
+    El email y el firebase_uid vienen del token verificado, no del body —
+    el cliente no puede autoasignarse un login ajeno."""
+    persona = Persona(**data.model_dump())
+    db.add(persona)
+    await db.flush()
+
+    usuario = Usuario(persona_id=persona.id, email=email, firebase_uid=firebase_uid)
+    db.add(usuario)
+    await db.commit()
+    await db.refresh(persona)
+    await db.refresh(usuario)
+    return persona, usuario
 
 
 async def actualizar_usuario(db: AsyncSession, usuario: Usuario, data: UsuarioUpdate) -> Usuario:

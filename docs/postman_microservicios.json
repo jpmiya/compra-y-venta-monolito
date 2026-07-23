@@ -48,6 +48,15 @@
     {
       "name": "01 - Identidad y Acceso",
       "item": [
+        {
+          "name": "Auto-registro (primer acceso)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/registro",
+            "body": { "mode": "raw", "raw": "{\n  \"nombre_completo\": \"Juan Pérez\",\n  \"documento_identidad\": \"30111222\",\n  \"telefono\": \"1155667788\",\n  \"fecha_nacimiento\": \"1995-05-10\"\n}" }
+          }
+        },
         { "name": "Listar personas", "request": { "method": "GET", "url": "{{base_url}}/personas" } },
         {
           "name": "Crear persona",

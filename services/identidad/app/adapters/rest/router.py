@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_db, get_current_active_user
+from app.core.dependencies import get_db, get_current_active_user, get_verified_firebase_payload
 from app import service
 from app.adapters.rest.schemas import (
     DireccionCreate,
@@ -12,12 +12,48 @@ from app.adapters.rest.schemas import (
     PersonaCreate,
     PersonaResponse,
     PersonaUpdate,
+    RegistroRequest,
+    RegistroResponse,
     UsuarioCreate,
     UsuarioResponse,
     UsuarioUpdate,
 )
 
 router = APIRouter(tags=["Identidad"])
+
+
+# --- Registro de primer acceso ---
+# Único endpoint que no exige un `usuario` local previo: solo un token de
+# Firebase válido. Resuelve el huevo-y-la-gallina de get_current_active_user
+# (todo lo demás en este servicio exige que el usuario ya exista).
+
+@router.post("/registro", response_model=RegistroResponse, status_code=status.HTTP_201_CREATED)
+async def registro_self(
+    data: RegistroRequest,
+    payload: dict = Depends(get_verified_firebase_payload),
+    db: AsyncSession = Depends(get_db),
+):
+    firebase_uid = payload["uid"]
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El token de Firebase no tiene un email asociado",
+        )
+    if await service.get_usuario_by_firebase_uid(db, firebase_uid):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un usuario registrado para este login",
+        )
+    if await service.get_usuario_by_email(db, email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ya registrado")
+    if await service.get_persona_by_documento(db, data.documento_identidad):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una persona con ese documento de identidad",
+        )
+    persona, usuario = await service.registrar_self(db, data, email, firebase_uid)
+    return RegistroResponse(persona=persona, usuario=usuario)
 
 
 # --- Personas ---

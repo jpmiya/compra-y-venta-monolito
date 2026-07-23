@@ -80,7 +80,7 @@ docker compose stop test-db       # (opcional) apagar al terminar
   - Endpoint interno extra `GET /interno/productos/{id}` (lo van a consumir Carrito y Delivery en las etapas 4-5).
   - FKs cross-service (`vendedor_id`, `direccion_punto_venta_id`, `Resena.usuario_id`) sin constraint físico, como en Billetera.
 - **Identidad**: se agregó `GET /interno/direcciones?ids=` (batch) + 2 tests. Cuidado con el orden de rutas: va declarado antes de `/interno/direcciones/{id}`.
-- **Tests: todo verde** — Carrito **20/20**, Delivery **12/12** (8 ciclo de vida + 4 CrearDeliveries/idempotencia), Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **14/14**, Billetera **10/10**, monolito **63/63** (**144 total**), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db carrito-test-db`.
+- **Tests: todo verde** — Carrito **20/20**, Delivery **12/12** (8 ciclo de vida + 4 CrearDeliveries/idempotencia), Catálogo **25/25** (10 productos + 6 búsqueda + 9 stock/saga), Identidad **20/20** (7 admin + 7 interno + 6 registro), Billetera **10/10**, monolito **63/63** (**150 total**), vía `docker compose up -d test-db identidad-test-db billetera-test-db catalogo-test-db delivery-test-db carrito-test-db`.
 - Entorno local de esta máquina: venv con **Python 3.12** (el 3.9 del sistema no compila `cryptography`); `.env` creado desde `.env.example` apuntando a `localhost:5433` (no se commitea). Ojo: el container `pagina-perfumes-no-back-db-1` (otro proyecto) se auto-levanta con Docker y pisa el puerto 5433 — frenarlo antes de correr tests (`docker stop pagina-perfumes-no-back-db-1`).
 
 ### Qué sigue (para Juampi — todo lo automatizable ya está hecho)
@@ -188,7 +188,8 @@ Detalle completo en `PLAN_MIGRACION_MICROSERVICIOS.md`. Resumen:
 - [x] REST API: ABM personas/usuarios/direcciones
 - [x] Firebase Auth adapter (`verify_id_token`)
 - [x] Endpoint de consulta de usuario/dirección por ID (para los demás servicios, síncrono REST) — `/interno/usuarios/{id}`, `/interno/usuarios/by-firebase/{uid}`, `/interno/direcciones/{id}`
-- [x] Tests: 7 admin + 5 interno = **12/12 verde**
+- [x] `POST /registro`: auto-registro de primer acceso (crea Persona + Usuario a partir de un token de Firebase válido, sin exigir usuario previo — todo el resto del servicio sí lo exige). Detectado como gap real en el e2e: a diferencia del monolito (`/web/registro`), no había forma de dar de alta el primer usuario de un microservicio limpio.
+- [x] Tests: 7 admin + 7 interno + 6 registro = **20/20 verde**
 
 ### Servicio 2 — Billetera (`billetera`) — **pivote de la saga**
 - [x] Extraer a servicio hexagonal con BD propia (billeteras, transacciones_billetera, mensajes_procesados)
